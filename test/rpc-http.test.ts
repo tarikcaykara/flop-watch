@@ -128,8 +128,34 @@ describe("rpcCall", () => {
 	});
 
 	it("classifies an unreachable endpoint as network_error", async () => {
-		const outcome = failure(await rpcCall("http://127.0.0.1:1", "system_health"));
+		const closed = createServer().listen(0, "127.0.0.1");
+		await once(closed, "listening");
+		const address = closed.address();
+		assert.ok(address && typeof address === "object");
+		closed.close();
+		await once(closed, "close");
+		const outcome = failure(await rpcCall(`http://127.0.0.1:${address.port}`, "system_health"));
 		assert.equal(outcome.result, "network_error");
+	});
+
+	it("does not follow redirects: a 3xx is an http_error and nothing else is contacted", async () => {
+		const elsewhere: string[] = [];
+		const target = createServer((req, res) => {
+			elsewhere.push(req.url ?? "");
+			res.end();
+		}).listen(0, "127.0.0.1");
+		await once(target, "listening");
+		const address = target.address();
+		assert.ok(address && typeof address === "object");
+		try {
+			reply(307, "", { location: `http://127.0.0.1:${address.port}/` });
+			const outcome = failure(await rpcCall(url, "system_health"));
+			assert.equal(outcome.result, "http_error");
+			assert.equal(outcome.httpStatus, 307);
+			assert.deepEqual(elsewhere, []);
+		} finally {
+			target.close();
+		}
 	});
 });
 
@@ -149,6 +175,16 @@ describe("method allowlist", () => {
 			/state_call not allowed/,
 		);
 		await assert.rejects(rpcCall(url, "toString"), /not allowed/);
+		for (const method of ["__proto__", "constructor", "System_health", "chain_getheader"]) {
+			await assert.rejects(rpcCall(url, method), /not allowed/, method);
+		}
+		for (const params of [
+			["BabeApi_configuration"],
+			["BabeApi_configuration", "0x", "0xabc", "extra"],
+			["BabeApi_configuration", "0x", 42],
+		]) {
+			await assert.rejects(rpcCall(url, "state_call", params), /state_call not allowed/);
+		}
 		assert.equal(seen.length, 0);
 	});
 
@@ -170,6 +206,9 @@ describe("method allowlist", () => {
 			assert.doesNotThrow(() => assertAllowed(method, []), method);
 		}
 		assert.doesNotThrow(() => assertAllowed("state_call", ["BabeApi_configuration", "0x"]));
+		assert.doesNotThrow(() =>
+			assertAllowed("state_call", ["BabeApi_configuration", "0x", `0x${"ab".repeat(32)}`]),
+		);
 	});
 });
 

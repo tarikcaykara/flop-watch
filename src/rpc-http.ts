@@ -2,9 +2,8 @@
 // A failed call is a measurement, not an exception: rpcCall classifies it and returns.
 
 import type { ProbeResult } from "./metrics.ts";
-import { VERSION } from "./version.ts";
+import { USER_AGENT } from "./version.ts";
 
-export const USER_AGENT = `flop-watch/${VERSION} (+https://github.com/tarikcaykara/flop-watch)`;
 export const REQUEST_TIMEOUT_MS = 10_000;
 
 /** Every JSON-RPC method flop-watch may call, over HTTP or WebSocket. All are reads. */
@@ -32,7 +31,11 @@ export function assertAllowed(method: string, params: readonly unknown[]): void 
 	if (!Object.hasOwn(ALLOWED_METHODS, method)) throw new Error(`RPC method not allowed: ${method}`);
 	if (
 		method === "state_call" &&
-		!(params[0] === "BabeApi_configuration" && params[1] === "0x" && params.length <= 3)
+		!(
+			params[0] === "BabeApi_configuration" &&
+			params[1] === "0x" &&
+			(params.length === 2 || (params.length === 3 && typeof params[2] === "string"))
+		)
 	) {
 		throw new Error(`RPC state_call not allowed: ${String(params[0])}`);
 	}
@@ -86,17 +89,24 @@ export async function rpcCall(
 				"user-agent": USER_AGENT,
 			},
 			body: JSON.stringify({ jsonrpc: "2.0", id: ++nextId, method, params }),
+			// A redirect would send the request to an endpoint that is not configured (hard rule 1)
+			// and report another host's health; a 3xx is recorded as http_error instead.
+			redirect: "manual",
 			signal: AbortSignal.timeout(options.timeoutMs ?? REQUEST_TIMEOUT_MS),
 		});
 		text = await response.text();
 	} catch (err) {
+		const cause = err instanceof Error ? err.cause : undefined;
 		const timedOut =
-			err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
-		const cause =
-			err instanceof Error && err.cause instanceof Error ? `: ${err.cause.message}` : "";
+			(err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) ||
+			(typeof cause === "object" &&
+				cause !== null &&
+				"code" in cause &&
+				cause.code === "UND_ERR_CONNECT_TIMEOUT");
+		const detail = cause instanceof Error ? `: ${cause.message}` : "";
 		return {
 			result: timedOut ? "timeout" : "network_error",
-			error: `${err instanceof Error ? err.message : String(err)}${cause}`,
+			error: `${err instanceof Error ? err.message : String(err)}${detail}`,
 			ms: elapsed(),
 			httpStatus: null,
 			retryAfterMs: null,
