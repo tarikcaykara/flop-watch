@@ -18,7 +18,8 @@ export function startMetricsServer(options: {
 }): Promise<Server> {
 	const { metrics, log } = options;
 	const server = createServer((req, res) => {
-		const path = new URL(req.url ?? "/", "http://localhost").pathname;
+		// Plain string split: `new URL()` throws on targets such as "//", which would crash the process.
+		const path = (req.url ?? "/").split("?", 1)[0];
 		if (req.method !== "GET" && req.method !== "HEAD") {
 			res.writeHead(405, { allow: "GET, HEAD" }).end();
 		} else if (path === "/healthz") {
@@ -57,12 +58,14 @@ async function main(): Promise<void> {
 	process.on("unhandledRejection", (reason) => log.error("unhandled rejection", { err: reason }));
 
 	const metrics = createMetrics();
-	const server = await startMetricsServer({
-		host: config.host,
-		port: config.port,
-		metrics,
-		log,
-	});
+	let server: Server;
+	try {
+		server = await startMetricsServer({ host: config.host, port: config.port, metrics, log });
+	} catch (err) {
+		log.error("cannot listen", { host: config.host, port: config.port, err });
+		process.exitCode = 1;
+		return;
+	}
 	log.info("flop-watch started", {
 		version: VERSION,
 		host: config.host,

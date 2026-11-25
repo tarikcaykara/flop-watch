@@ -16,7 +16,9 @@ describe("createLogger", () => {
 		assert.equal(info.msg, "shown");
 		assert.equal(info.network, "testnet");
 		assert.ok(!Number.isNaN(Date.parse(info.time)));
-		assert.deepEqual(error.err, { name: "TypeError", message: "boom" });
+		assert.equal(error.err.name, "TypeError");
+		assert.equal(error.err.message, "boom");
+		assert.match(error.err.stack, /TypeError: boom/);
 		assert.equal(error.slot, "1795635206");
 	});
 });

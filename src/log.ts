@@ -7,9 +7,10 @@ export type Logger = Readonly<Record<LogLevel, (msg: string, fields?: LogFields)
 
 const RANK: Readonly<Record<LogLevel, number>> = { debug: 10, info: 20, warn: 30, error: 40 };
 
-/** Errors become `{name, message}` and bigints become strings; JSON.stringify drops or throws on both. */
+/** Errors become `{name, message, stack}` and bigints strings; JSON.stringify drops or throws on both. */
 function replacer(_key: string, value: unknown): unknown {
-	if (value instanceof Error) return { name: value.name, message: value.message };
+	if (value instanceof Error)
+		return { name: value.name, message: value.message, stack: value.stack };
 	if (typeof value === "bigint") return value.toString();
 	return value;
 }
