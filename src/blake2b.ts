@@ -3,7 +3,7 @@
 // part of the parameter block). Headers arrive about once a second per network, so a compact
 // BigInt implementation is fast enough.
 
-import { encodeCompact, hexToBytes, type RpcHeader } from "./babe.ts";
+import { encodeCompact, hexToBytes, parseBlockNumber, type RpcHeader } from "./babe.ts";
 
 const MASK = (1n << 64n) - 1n;
 const IV = [
@@ -42,30 +42,43 @@ const STEPS = [
 
 const rotr = (x: bigint, n: bigint) => ((x >> n) | (x << (64n - n))) & MASK;
 
+/** Every index below is fixed by the algorithm, so a miss is a bug: fail loudly, never use 0. */
+function must<T>(value: T | undefined): T {
+	if (value === undefined) throw new Error("BLAKE2b: index out of range");
+	return value;
+}
+
 function compress(h: bigint[], block: Uint8Array, counter: bigint, last: boolean): void {
 	const data = new DataView(block.buffer, block.byteOffset, block.byteLength);
 	const m = Array.from({ length: 16 }, (_, i) => data.getBigUint64(i * 8, true));
 	const v = [...h, ...IV];
-	const word = (i: number) => v[i] ?? 0n;
-	v[12] = word(12) ^ (counter & MASK);
-	v[13] = word(13) ^ (counter >> 64n);
-	if (last) v[14] = word(14) ^ MASK;
+	v[12] = must(v[12]) ^ (counter & MASK);
+	v[13] = must(v[13]) ^ (counter >> 64n);
+	if (last) v[14] = must(v[14]) ^ MASK;
 	for (let round = 0; round < 12; round++) {
-		const s = SIGMA[round % 10] ?? SIGMA[0];
+		const s = must(SIGMA[round % 10]);
 		STEPS.forEach(([a, b, c, d], step) => {
-			const x = m[s[2 * step] ?? 0] ?? 0n;
-			const y = m[s[2 * step + 1] ?? 0] ?? 0n;
-			v[a] = (word(a) + word(b) + x) & MASK;
-			v[d] = rotr(word(d) ^ word(a), 32n);
-			v[c] = (word(c) + word(d)) & MASK;
-			v[b] = rotr(word(b) ^ word(c), 24n);
-			v[a] = (word(a) + word(b) + y) & MASK;
-			v[d] = rotr(word(d) ^ word(a), 16n);
-			v[c] = (word(c) + word(d)) & MASK;
-			v[b] = rotr(word(b) ^ word(c), 63n);
+			const x = must(m[must(s[2 * step])]);
+			const y = must(m[must(s[2 * step + 1])]);
+			let va = must(v[a]);
+			let vb = must(v[b]);
+			let vc = must(v[c]);
+			let vd = must(v[d]);
+			va = (va + vb + x) & MASK;
+			vd = rotr(vd ^ va, 32n);
+			vc = (vc + vd) & MASK;
+			vb = rotr(vb ^ vc, 24n);
+			va = (va + vb + y) & MASK;
+			vd = rotr(vd ^ va, 16n);
+			vc = (vc + vd) & MASK;
+			vb = rotr(vb ^ vc, 63n);
+			v[a] = va;
+			v[b] = vb;
+			v[c] = vc;
+			v[d] = vd;
 		});
 	}
-	for (let i = 0; i < 8; i++) h[i] = (h[i] ?? 0n) ^ word(i) ^ word(i + 8);
+	for (let i = 0; i < 8; i++) h[i] = must(h[i]) ^ must(v[i]) ^ must(v[i + 8]);
 }
 
 /** BLAKE2b with a 32-byte digest and no key. */
@@ -83,19 +96,19 @@ export function blake2b256(input: Uint8Array): Uint8Array {
 	}
 	const out = new Uint8Array(32);
 	const data = new DataView(out.buffer);
-	for (let i = 0; i < 4; i++) data.setBigUint64(i * 8, h[i] ?? 0n, true);
+	for (let i = 0; i < 4; i++) data.setBigUint64(i * 8, must(h[i]), true);
 	return out;
 }
 
 /**
  * The block hash: BLAKE2b-256 of the SCALE-encoded header
  * (`parentHash | compact(number) | stateRoot | extrinsicsRoot | compact(logs) | logs…`).
- * The digest logs are already SCALE-encoded. Throws on malformed hex.
+ * The digest logs are already SCALE-encoded. Throws on malformed hex or block number.
  */
 export function headerHash(header: RpcHeader): string {
 	const encoded = Buffer.concat([
 		hexToBytes(header.parentHash),
-		encodeCompact(Number.parseInt(header.number, 16)),
+		encodeCompact(parseBlockNumber(header.number)),
 		hexToBytes(header.stateRoot),
 		hexToBytes(header.extrinsicsRoot),
 		encodeCompact(header.digest.logs.length),

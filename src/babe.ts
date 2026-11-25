@@ -21,6 +21,7 @@ export interface BabePreDigest {
 }
 
 const HEX_RE = /^0x(?:[0-9a-fA-F]{2})*$/;
+const BLOCK_NUMBER_RE = /^0x[0-9a-fA-F]{1,8}$/;
 const PRE_RUNTIME = 0x06;
 const BABE_ENGINE_ID = [0x42, 0x41, 0x42, 0x45]; // "BABE"
 
@@ -41,7 +42,13 @@ export function isRpcHeader(value: unknown): value is RpcHeader {
 /** Decodes 0x-prefixed hex; throws on anything else. */
 export function hexToBytes(hex: string): Uint8Array {
 	if (!HEX_RE.test(hex)) throw new Error(`invalid hex: ${hex.slice(0, 20)}`);
-	return Uint8Array.from(Buffer.from(hex.slice(2), "hex"));
+	return Buffer.from(hex.slice(2), "hex");
+}
+
+/** Parses a JSON-RPC block number (`"0x…"`, a u32); throws on anything else. */
+export function parseBlockNumber(hex: string): number {
+	if (!BLOCK_NUMBER_RE.test(hex)) throw new Error(`invalid block number: ${hex.slice(0, 20)}`);
+	return Number.parseInt(hex.slice(2), 16);
 }
 
 const view = (bytes: Uint8Array) => new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);

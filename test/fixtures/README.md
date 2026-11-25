@@ -19,7 +19,9 @@ The values were cross-checked independently of `src/` while recording:
 - **Timestamps.** The Devnet `timestampMs` and `hash` equal the explorer's
   `https://explorer.devnet.flop.network/api/blocks` entries.
 - **Slots.** Every `babe.slot` equals `floor(timestampMs / 1000)`, the 1 s slot rule. The tests
-  check the slot against `timestampMs`, not against the recorded `babe.slot`.
+  check the decoded slot against both `timestampMs` and the recorded `babe.slot`.
+- **Variant and authority index.** `babe.variant` and `babe.authorityIndex` were decoded from the
+  raw log bytes by a separate Python decoder written for the recording, not by `src/` or `poc/`.
 
 `babeConfiguration` is the raw result of `state_call ["BabeApi_configuration", "0x"]` on each
 network.

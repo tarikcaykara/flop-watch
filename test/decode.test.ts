@@ -58,6 +58,14 @@ describe("blake2b256", () => {
 			hex(blake2b256(new Uint8Array(129).fill(0x61))),
 			"0x2f64744a6de0d2c0b56e64cf6e29a5aaa255010d415d51c75ccc82f73dccd865",
 		);
+		assert.equal(
+			hex(blake2b256(new Uint8Array(256).fill(0x61))),
+			"0xeae4d3a7627549b383179dc18049964f91a6fed14c9f3fb26705eda3eeda5558",
+		);
+		assert.equal(
+			hex(blake2b256(new Uint8Array(1000).fill(0x61))),
+			"0xe00b0ddbf1e2cdaf5c898e1a5e8826ea3a2c339bcf2a478da2e5fca9ff126672",
+		);
 	});
 });
 
@@ -68,10 +76,16 @@ describe("headerHash", () => {
 		});
 	}
 
-	it("throws on malformed hex", () => {
+	it("throws on malformed hex or block number", () => {
+		const header = firstHeader("testnet");
+		assert.throws(() => headerHash({ ...header, stateRoot: "0xzz" }), /invalid hex/);
 		assert.throws(
-			() => headerHash({ ...firstHeader("testnet"), stateRoot: "0xzz" }),
-			/invalid hex/,
+			() => headerHash({ ...header, number: header.number.slice(2) }),
+			/invalid block number/,
+		);
+		assert.throws(
+			() => headerHash({ ...header, number: `${header.number}zz` }),
+			/invalid block number/,
 		);
 	});
 });
@@ -84,6 +98,7 @@ describe("BABE pre-digest", () => {
 				assert.ok(decoded);
 				// BABE requires the block's timestamp inherent to fall in its slot.
 				assert.equal(decoded.slot, BigInt(Math.floor(timestampMs / 1000)));
+				assert.equal(decoded.slot, BigInt(babe.slot));
 				assert.equal(decoded.variant, babe.variant);
 				assert.equal(decoded.authorityIndex, babe.authorityIndex);
 			}
@@ -107,12 +122,16 @@ describe("BABE pre-digest", () => {
 });
 
 describe("SCALE compact", () => {
-	// Examples from the SCALE codec specification, plus the largest supported value.
+	// Examples from the SCALE codec specification, the mode boundaries and the largest supported value.
 	const cases: Array<[number, string]> = [
 		[0, "0x00"],
 		[1, "0x04"],
 		[42, "0xa8"],
+		[63, "0xfc"],
+		[64, "0x0101"],
 		[69, "0x1501"],
+		[16383, "0xfdff"],
+		[16384, "0x02000100"],
 		[65535, "0xfeff0300"],
 		[2 ** 30 - 1, "0xfeffffff"],
 	];
@@ -125,6 +144,11 @@ describe("SCALE compact", () => {
 				length: (encoded.length - 2) / 2,
 			});
 		}
+	});
+
+	it("decodes at an offset inside a subarray", () => {
+		const bytes = hexToBytes("0xaabbccfeffffff").subarray(2);
+		assert.deepEqual(decodeCompact(bytes, 1), { value: 2 ** 30 - 1, length: 4 });
 	});
 
 	it("rejects the big-integer mode, truncated input and out-of-range values", () => {
