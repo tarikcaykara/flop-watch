@@ -14,8 +14,9 @@ continuously, from the outside:
 It keeps the history in Prometheus and shows it in Grafana. Every signal is labelled as
 **measured** (by flop-watch), **reported** (by a FLOP service) or **derived** (by a rule).
 
-> **Status: pre-alpha.** Research is done (M0). The collector is being built (M1). There is nothing
-> to run yet beyond the research probes. See the
+> **Status: pre-alpha.** The collector core (M1) runs: it watches both networks over WebSocket and
+> HTTP JSON-RPC and serves Prometheus metrics. Faucet and explorer probes (M2) and the Docker
+> Compose stack with Prometheus and Grafana (M3) come next. See the
 > [milestones](https://github.com/tarikcaykara/flop-watch/milestones).
 
 flop-watch is a community project. It is not affiliated with or endorsed by FLOP Labs.
@@ -25,6 +26,20 @@ flop-watch is a community project. It is not affiliated with or endorsed by FLOP
 - [Research](docs/research.md): verified endpoints, PoC results, existing tools and limitations.
 - [Architecture](docs/architecture.md): collector, metrics, rules, dashboard and deployment design.
 - [MVP](docs/mvp.md): scope, acceptance criteria, roadmap and go/no-go.
+
+## Running the collector
+
+You need Node 24 or later and pnpm 10:
+
+```bash
+pnpm install --prod
+node src/main.ts                          # metrics on http://0.0.0.0:10063/metrics
+FLOPWATCH_NETWORKS=testnet node src/main.ts
+```
+
+The configuration comes from `FLOPWATCH_*` environment variables
+([architecture §9](docs/architecture.md#9-configuration)). The collector only reads: JSON-RPC
+methods on a fixed allowlist, and HTTP GETs.
 
 ## Research probes
 
