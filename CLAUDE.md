@@ -35,8 +35,8 @@ code, comments, docs, commits, issues and PRs.
    alert states whether its signal is measured, reported or derived.
 6. **Traffic budget.** Steady state is ≤ 0.25 requests/s per network. Changing a cadence means
    updating the budget table in architecture §4 in the same PR.
-7. **One runtime dependency:** `prom-client`. Adding another runtime dependency needs the owner's
-   approval.
+7. **One runtime dependency:** `@prometheus-io/client` (the official successor of the deprecated
+   `prom-client`). Adding another runtime dependency needs the owner's approval.
 8. **Nothing private in the repo.** No hostnames, servers or tunnels of the public instance, and
    no personal data.
 
@@ -47,7 +47,7 @@ code, comments, docs, commits, issues and PRs.
 | Runtime | Node 24 LTS, running `.ts` directly through type stripping (no build step, no `dist/`) |
 | Language | TypeScript strict, `erasableSyntaxOnly` (no enums, namespaces or parameter properties) |
 | Package manager | pnpm 10 |
-| Metrics | `prom-client` (only runtime dependency) |
+| Metrics | `@prometheus-io/client` (only runtime dependency) |
 | Transport | Global `fetch` and `WebSocket`, raw JSON-RPC 2.0 |
 | HTTP server | `node:http` |
 | Tests | `node:test`, offline, with recorded fixtures |

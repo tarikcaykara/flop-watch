@@ -43,7 +43,7 @@ flowchart LR
 | Runtime | Node 24 LTS, running `.ts` directly through type stripping | No build step and no `dist/`. Node v24.11.0 strips types silently (`process.features.typescript === "strip"`), as all PoCs show. Node is the runtime the FLOP packages target. |
 | Type check | `tsc --noEmit` | Type checking only, never emitting |
 | Modules / package manager | ESM, pnpm | Maintainer's standard |
-| Runtime dependency | **`prom-client` only** | Metric types, the registry and default process metrics |
+| Runtime dependency | **`@prometheus-io/client` only** | Metric types, the registry and default process metrics. It is `prom-client` moved to the Prometheus organisation; `prom-client` is deprecated on npm in its favour (2026-08). Same Apache-2.0 licence and transitive dependencies. |
 | Dev dependencies | `typescript`, `@types/node`, `@biomejs/biome` | Type check, lint and format |
 | Chain transport | Global `fetch` and `WebSocket`, raw JSON-RPC 2.0 | Verified in the PoC. Uses the legacy `chain_subscribeNewHeads`, `chain_subscribeFinalizedHeads` and `state_subscribeRuntimeVersion`, which were accepted on both networks with no drop in 300 s |
 | HTTP server | `node:http` | One route (`/metrics`) plus `/healthz`; no framework needed |
@@ -186,7 +186,7 @@ Hashes other than the genesis hash, addresses and error text are **never** label
 | RPC node | reported | `flopwatch_rpc_node_peers{network,transport}`, `flopwatch_rpc_node_is_syncing{network,transport}`, `flopwatch_rpc_http_best_block_number{network}` |
 | Faucet | reported | `flopwatch_faucet_status{network,status}` (state-set: `open`, `low_balance`, `unknown`, `other`), `flopwatch_faucet_stale{network}`, `flopwatch_faucet_limits_as_of_timestamp_seconds{network}`, `flopwatch_faucet_balance_flop`, `flopwatch_faucet_min_balance_flop`, `flopwatch_faucet_daily_cap_limit_flop`, `flopwatch_faucet_daily_cap_used_flop`, `flopwatch_faucet_daily_cap_remaining_flop`, `flopwatch_faucet_pending_grants`, `flopwatch_faucet_sponsor_status{network,lane,status}` (lane ∈ {`miner`, `validator`}; status ∈ {`open`, `automatic_full`, `positions_full`, `unknown`, `other`}), `flopwatch_faucet_health_ready{network}`, `flopwatch_faucet_health_http_status_code{network}`, `flopwatch_faucet_dependency_ok{network,dependency}` (dependency ∈ {`signer`, `indexer`, `ip_classification`, `funding`, `signing`}; `ok` missing or null → series absent), `flopwatch_faucet_indexer_lag_blocks{network}` (when present) |
 | Explorer | reported | `flopwatch_explorer_latest_block_number{network}`, `flopwatch_explorer_finalized_lag_blocks{network}`, `flopwatch_explorer_safe_mode{network}` |
-| Self | measured | `flopwatch_build_info{version}`, `flopwatch_schema_mismatch_total{network,target,field}`, prom-client default process metrics |
+| Self | measured | `flopwatch_build_info{version}`, `flopwatch_schema_mismatch_total{network,target,field}`, the client library's default process metrics |
 
 Notes:
 
@@ -397,5 +397,6 @@ mirror. [Decision]
 | Blackbox / json_exporter or Uptime Kuma | Cannot evaluate JSON-RPC semantics (heads, slots, finality, genesis) without extra components |
 | Alertmanager or notifications | User decision: incidents are derived and shown only |
 | Zod | Only about 20 fields are read; hand-written tolerant parsers with fixtures suffice |
+| `prom-client` | Deprecated on npm in favour of `@prometheus-io/client`, the same code base under the Prometheus organisation (owner-approved switch, #4) |
 | Grafana externally shared dashboards | Not file-provisionable; unverified for the pinned version, so confirm at M3 |
 | Per-validator authority metrics | Validator seats will grow toward 1,000, which means high cardinality; YAGNI |
