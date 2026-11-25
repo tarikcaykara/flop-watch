@@ -1,0 +1,400 @@
+{
+  "script": "services",
+  "startedAt": "2026-11-25T19:13:39.283Z",
+  "finishedAt": "2026-11-25T19:13:40.439Z",
+  "node": "v24.11.0",
+  "networks": {
+    "testnet": {
+      "targets": {
+        "faucet_limits": {
+          "url": "https://faucet.flop.network/limits",
+          "requests": 1,
+          "latencyMs": {
+            "n": 1,
+            "min": 189.725,
+            "p50": 189.725,
+            "p95": 189.725,
+            "max": 189.725,
+            "avg": 189.725
+          },
+          "httpStatusCounts": {
+            "200": 1
+          },
+          "errors": [],
+          "headers": [
+            {
+              "cf-cache-status": "DYNAMIC",
+              "server": "cloudflare"
+            }
+          ]
+        },
+        "faucet_health": {
+          "url": "https://faucet.flop.network/health",
+          "requests": 1,
+          "latencyMs": {
+            "n": 1,
+            "min": 201.717,
+            "p50": 201.717,
+            "p95": 201.717,
+            "max": 201.717,
+            "avg": 201.717
+          },
+          "httpStatusCounts": {
+            "503": 1
+          },
+          "errors": [],
+          "headers": [
+            {
+              "cf-cache-status": "DYNAMIC",
+              "retry-after": "60",
+              "server": "cloudflare"
+            }
+          ]
+        },
+        "faucet_chain": {
+          "url": "https://faucet.flop.network/chain",
+          "requests": 1,
+          "latencyMs": {
+            "n": 1,
+            "min": 364.855,
+            "p50": 364.855,
+            "p95": 364.855,
+            "max": 364.855,
+            "avg": 364.855
+          },
+          "httpStatusCounts": {
+            "200": 1
+          },
+          "errors": [],
+          "headers": [
+            {
+              "cf-cache-status": "DYNAMIC",
+              "server": "cloudflare"
+            }
+          ]
+        },
+        "explorer_stats": {
+          "url": "https://testnet.flopscan.io/api/stats",
+          "requests": 1,
+          "latencyMs": {
+            "n": 1,
+            "min": 394.355,
+            "p50": 394.355,
+            "p95": 394.355,
+            "max": 394.355,
+            "avg": 394.355
+          },
+          "httpStatusCounts": {
+            "503": 1
+          },
+          "errors": [],
+          "headers": [
+            {
+              "server": "cloudflare"
+            }
+          ]
+        }
+      },
+      "limits": {
+        "asOfAgeSec": {
+          "n": 1,
+          "min": 55.108,
+          "p50": 55.108,
+          "p95": 55.108,
+          "max": 55.108,
+          "avg": 55.108
+        },
+        "staleValues": [
+          false
+        ],
+        "faucetStatusValues": [
+          "open"
+        ],
+        "sponsorMinerStatuses": [
+          "open"
+        ],
+        "sponsorValidatorStatuses": [
+          "automatic_full"
+        ],
+        "sponsorReasons": [],
+        "pendingGrants": {
+          "min": 0,
+          "max": 0
+        },
+        "balanceFlop": [
+          "3842877"
+        ],
+        "dailyCapRemainingFlop": [
+          "2806080"
+        ]
+      },
+      "health": {
+        "statusValues": [
+          "degraded"
+        ],
+        "readyValues": [
+          false
+        ],
+        "httpCodes": [
+          503
+        ],
+        "dependencies": {
+          "signer": {
+            "ok": [
+              true
+            ],
+            "reason": [
+              null
+            ]
+          },
+          "indexer": {
+            "ok": [
+              false
+            ],
+            "reason": [
+              "indexer_unavailable"
+            ]
+          },
+          "ip_classification": {
+            "ok": [
+              true
+            ],
+            "reason": [
+              null
+            ]
+          },
+          "funding": {
+            "ok": [
+              true
+            ],
+            "reason": [
+              null
+            ]
+          },
+          "signing": {
+            "ok": [
+              null
+            ],
+            "reason": [
+              null
+            ]
+          }
+        },
+        "indexerLagBlocks": null
+      },
+      "faucetChain": {
+        "network": "testnet",
+        "genesisHash": "0x918abd58fb16306b30ef3886514cfaebffecb4de43e82b6f8ec4795c43cfd800"
+      },
+      "faucetGenesisMatch": true,
+      "explorer": {
+        "finalityStateValues": [],
+        "finalizedLag": null,
+        "latestBlockNumber": null,
+        "errorBodies": [
+          "{\"error\":\"Era-T reader unavailable\"}"
+        ]
+      },
+      "timeline": [
+        {
+          "at": "2026-11-25T19:13:40.437Z",
+          "limitsHttp": 200,
+          "limitsMs": 190,
+          "faucetStatus": "open",
+          "stale": false,
+          "minerStatus": "open",
+          "validatorStatus": "automatic_full",
+          "healthHttp": 503,
+          "healthStatus": "degraded",
+          "explorerHttp": 503
+        }
+      ],
+      "firstBodies": {
+        "faucet_chain": {
+          "httpStatus": 200,
+          "body": {
+            "network": "testnet",
+            "chain": "FLOP Testnet",
+            "genesisHash": "0x918abd58fb16306b30ef3886514cfaebffecb4de43e82b6f8ec4795c43cfd800",
+            "caip2": "polkadot:918abd58fb16306b30ef3886514cfaeb",
+            "ss58Format": 42,
+            "decimals": 18,
+            "tokenSymbol": "FLOP",
+            "rpc": "wss://testnet.flop.network",
+            "walletConnect": false,
+            "technocoreBot": {
+              "did": "did:key:z6MktjwdcBkwC6xo9wi4KY4ckWvn1GQHdQ1qzkaZtWqHAoxs",
+              "room": "flop-testnet-faucet"
+            }
+          }
+        },
+        "faucet_limits": {
+          "httpStatus": 200,
+          "body": {
+            "network": "testnet",
+            "faucet": {
+              "status": "open",
+              "signer": "5CcDr5BcVWGqdyk7EK3S43PPd4E1yTFHPMGjtjqvRLttgXtw",
+              "balanceFlop": "3842877",
+              "minBalanceFlop": "5000",
+              "dailyCap": {
+                "limitFlop": "10000000",
+                "usedFlop": "7193920",
+                "remainingFlop": "2806080"
+              },
+              "pendingGrants": 0,
+              "anonymous": {
+                "grantFlop": 25,
+                "addressCooldownSeconds": 86400
+              },
+              "linked": {
+                "baseFlop": 500,
+                "perGrantCapFlop": 2000,
+                "rolling7DayCapFlop": 2000,
+                "identityCooldownSeconds": 86400
+              },
+              "agent": {
+                "grantFlop": 10,
+                "claimPath": "/v1/testnet/agent-claims",
+                "rolling24HourCapFlop": 10,
+                "cooldownSeconds": 86400,
+                "rolloverRequiresSpend": true
+              },
+              "perClient": {
+                "ipGrantsPerDay": 3,
+                "ipRangeGrantsPerDay": 20,
+                "ipCooldownSeconds": 86400
+              }
+            },
+            "sponsor": {
+              "miner": {
+                "status": "open",
+                "signer": "5E9jfrPrvQJvkjoSGLTdeqmqWHvAgxyGyTNW8VqtCUtgVcnb",
+                "spendableFlop": "2000000",
+                "capacity": {
+                  "signers": 1,
+                  "used": 0,
+                  "max": 64,
+                  "active": 0,
+                  "unbonding": 0,
+                  "other": 0
+                },
+                "dailyNewSponsorships": {
+                  "used": 0,
+                  "limit": 100
+                },
+                "dailyStakeBudget": {
+                  "limitFlop": "10000000",
+                  "usedFlop": "0"
+                },
+                "automatic": null
+              },
+              "validator": {
+                "status": "automatic_full",
+                "signer": "5HDsVnQ4e5w4N47CFL87MAxrurXqDnci7KXV34mb9y32y1MW",
+                "spendableFlop": "120000000",
+                "capacity": {
+                  "signers": 1,
+                  "used": 0,
+                  "max": 64,
+                  "active": 0,
+                  "unbonding": 0,
+                  "other": 0
+                },
+                "dailyNewSponsorships": {
+                  "used": 0,
+                  "limit": 100
+                },
+                "dailyStakeBudget": {
+                  "limitFlop": "150000000",
+                  "usedFlop": "0"
+                },
+                "automatic": {
+                  "open": false,
+                  "sponsored": 6,
+                  "unsponsoredActive": 0
+                }
+              }
+            },
+            "asOf": "2026-11-25T19:12:45.330Z",
+            "stale": false
+          }
+        },
+        "faucet_health": {
+          "httpStatus": 503,
+          "body": {
+            "status": "degraded",
+            "signer": "5CcDr5BcVWGqdyk7EK3S43PPd4E1yTFHPMGjtjqvRLttgXtw",
+            "connected": true,
+            "freeBalanceRaw": "3842877026059041150000000",
+            "minBalanceRaw": "5000000000000000000000",
+            "decimals": 18,
+            "trustProxy": [
+              "172.20.0.1/32"
+            ],
+            "limits": {
+              "ipCooldownMs": 86400000,
+              "ipGrantsPerDay": 3,
+              "ipPrefixGrantsPerDay": 20,
+              "addressCooldownMs": 86400000,
+              "identityCooldownMs": 86400000,
+              "dailyCapFlop": 10000000,
+              "dailyCapExemptionConfigured": false
+            },
+            "image": {
+              "version": "0.1.489",
+              "revision": "af7e1e4f8adb70db2323f10ff1ea80cd943c0db3"
+            },
+            "live": true,
+            "ready": false,
+            "readinessScope": "dependencies and estimated funding capacity for this client; grant eligibility and unreviewed sponsor capacity checked on request",
+            "dependencies": {
+              "signer": {
+                "ok": true
+              },
+              "indexer": {
+                "ok": false,
+                "reason": "indexer_unavailable",
+                "error": "Indexer unavailable; retry later"
+              },
+              "ip_classification": {
+                "ok": true,
+                "details": {
+                  "exempt": true
+                }
+              },
+              "funding": {
+                "ok": true,
+                "asOf": "2026-11-25T19:12:45.330Z",
+                "stale": false,
+                "faucet": {
+                  "status": "open"
+                },
+                "sponsor": {
+                  "miner": {
+                    "status": "open"
+                  },
+                  "validator": {
+                    "status": "automatic_full"
+                  }
+                }
+              },
+              "signing": {
+                "held": false,
+                "reason": null,
+                "sinceSeconds": null
+              }
+            }
+          }
+        },
+        "explorer_stats": {
+          "httpStatus": 503,
+          "body": {
+            "error": "Era-T reader unavailable"
+          }
+        }
+      },
+      "firstOkBodies": {}
+    }
+  }
+}

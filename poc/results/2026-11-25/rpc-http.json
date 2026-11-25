@@ -1,0 +1,205 @@
+{
+  "script": "rpc-http",
+  "startedAt": "2026-11-25T19:00:13.623Z",
+  "finishedAt": "2026-11-25T19:00:52.862Z",
+  "node": "v24.11.0",
+  "networks": {
+    "devnet": {
+      "rpcHttp": "https://rpc.devnet.flop.network",
+      "requests": 34,
+      "latencyMs": {
+        "chain_getBlockHash": {
+          "n": 1,
+          "min": 360.855,
+          "p50": 360.855,
+          "p95": 360.855,
+          "max": 360.855,
+          "avg": 360.855
+        },
+        "state_getRuntimeVersion": {
+          "n": 1,
+          "min": 227.801,
+          "p50": 227.801,
+          "p95": 227.801,
+          "max": 227.801,
+          "avg": 227.801
+        },
+        "system_chain": {
+          "n": 1,
+          "min": 218.135,
+          "p50": 218.135,
+          "p95": 218.135,
+          "max": 218.135,
+          "avg": 218.135
+        },
+        "state_call": {
+          "n": 1,
+          "min": 333.513,
+          "p50": 333.513,
+          "p95": 333.513,
+          "max": 333.513,
+          "avg": 333.513
+        },
+        "chain_getHeader": {
+          "n": 10,
+          "min": 214.274,
+          "p50": 226.267,
+          "p95": 556.612,
+          "max": 556.612,
+          "avg": 280.136
+        },
+        "system_health": {
+          "n": 10,
+          "min": 206.451,
+          "p50": 222.88,
+          "p95": 505.048,
+          "max": 505.048,
+          "avg": 268.916
+        },
+        "chain_getFinalizedHead": {
+          "n": 10,
+          "min": 201.371,
+          "p50": 214.117,
+          "p95": 549.448,
+          "max": 549.448,
+          "avg": 251.739
+        }
+      },
+      "httpStatusCounts": {
+        "200": 34
+      },
+      "errorCounts": {},
+      "serverHeaders": [
+        "cloudflare"
+      ],
+      "cfCacheStatus": [
+        "DYNAMIC"
+      ],
+      "rateLimitHeaders": {},
+      "genesisHash": "0x99c172c095340ace980631f9123544c6bebd4839f3437e463533422d8be2d631",
+      "expectedGenesis": "0x99c172c095340ace980631f9123544c6bebd4839f3437e463533422d8be2d631",
+      "genesisMatch": true,
+      "chain": "FLOP Devnet",
+      "specName": "tzkv-runtime",
+      "implName": "zkv-node",
+      "specVersion": 1014034,
+      "transactionVersion": 2,
+      "slotDurationMs": 1000,
+      "epochLength": 3600,
+      "health": {
+        "peers": {
+          "min": 26,
+          "max": 26
+        },
+        "isSyncing": [
+          false,
+          true
+        ]
+      },
+      "bestNumbers": {
+        "first": 4637416,
+        "last": 4637451
+      },
+      "bestAdvancePerSec": 0.999,
+      "elapsedSec": 35.021
+    },
+    "testnet": {
+      "rpcHttp": "https://testnet.flop.network",
+      "requests": 34,
+      "latencyMs": {
+        "chain_getBlockHash": {
+          "n": 1,
+          "min": 5308.097,
+          "p50": 5308.097,
+          "p95": 5308.097,
+          "max": 5308.097,
+          "avg": 5308.097
+        },
+        "state_getRuntimeVersion": {
+          "n": 1,
+          "min": 231.439,
+          "p50": 231.439,
+          "p95": 231.439,
+          "max": 231.439,
+          "avg": 231.439
+        },
+        "system_chain": {
+          "n": 1,
+          "min": 262.145,
+          "p50": 262.145,
+          "p95": 262.145,
+          "max": 262.145,
+          "avg": 262.145
+        },
+        "state_call": {
+          "n": 1,
+          "min": 375.345,
+          "p50": 375.345,
+          "p95": 375.345,
+          "max": 375.345,
+          "avg": 375.345
+        },
+        "chain_getHeader": {
+          "n": 10,
+          "min": 195.572,
+          "p50": 197.89,
+          "p95": 218.381,
+          "max": 218.381,
+          "avg": 201.986
+        },
+        "system_health": {
+          "n": 10,
+          "min": 193.783,
+          "p50": 197.123,
+          "p95": 210.535,
+          "max": 210.535,
+          "avg": 198.9
+        },
+        "chain_getFinalizedHead": {
+          "n": 10,
+          "min": 196.007,
+          "p50": 199.14,
+          "p95": 209.037,
+          "max": 209.037,
+          "avg": 200.706
+        }
+      },
+      "httpStatusCounts": {
+        "200": 34
+      },
+      "errorCounts": {},
+      "serverHeaders": [
+        "cloudflare"
+      ],
+      "cfCacheStatus": [
+        "DYNAMIC"
+      ],
+      "rateLimitHeaders": {},
+      "genesisHash": "0x918abd58fb16306b30ef3886514cfaebffecb4de43e82b6f8ec4795c43cfd800",
+      "expectedGenesis": "0x918abd58fb16306b30ef3886514cfaebffecb4de43e82b6f8ec4795c43cfd800",
+      "genesisMatch": true,
+      "chain": "FLOP Testnet",
+      "specName": "flop-testnet",
+      "implName": "zkv-node",
+      "specVersion": 1014035,
+      "transactionVersion": 2,
+      "slotDurationMs": 1000,
+      "epochLength": 3600,
+      "health": {
+        "peers": {
+          "min": 17,
+          "max": 17
+        },
+        "isSyncing": [
+          false
+        ]
+      },
+      "bestNumbers": {
+        "first": 107807,
+        "last": 107840
+      },
+      "bestAdvancePerSec": 0.999,
+      "elapsedSec": 33.032
+    }
+  }
+}

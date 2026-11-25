@@ -1,0 +1,239 @@
+{
+  "script": "heads-ws",
+  "startedAt": "2026-11-25T19:00:13.629Z",
+  "finishedAt": "2026-11-25T19:05:20.392Z",
+  "node": "v24.11.0",
+  "seconds": 300,
+  "networks": {
+    "devnet": {
+      "rpcWs": "wss://rpc.devnet.flop.network",
+      "slotDurationMs": 1000,
+      "headerHashSelfCheck": true,
+      "connectMs": 517,
+      "connectError": null,
+      "subscriptions": {
+        "newHeads": {
+          "id": "DrNY1qEkGP8IfTqM",
+          "ms": 188.7
+        },
+        "finalizedHeads": {
+          "id": "kaMIhBojl8mEdFQj",
+          "ms": 188.9
+        },
+        "runtimeVersion": {
+          "id": "7ivtxYfMuQVRO3lN",
+          "ms": 203.8
+        }
+      },
+      "closeEvents": [
+        {
+          "code": 1000,
+          "reason": "",
+          "wasClean": true,
+          "atSec": 300.2,
+          "byUs": true
+        }
+      ],
+      "errorEvents": 0,
+      "invalidMessages": 0,
+      "observedSeconds": 300.2,
+      "headEvents": 250,
+      "finalizedEvents": 242,
+      "headArrivalIntervalMs": {
+        "n": 249,
+        "min": 1.702,
+        "p50": 1080.153,
+        "p95": 2561.136,
+        "max": 7434.214,
+        "avg": 1202.281
+      },
+      "finalizedArrivalIntervalMs": {
+        "n": 241,
+        "min": 6.072,
+        "p50": 1042.791,
+        "p95": 2720.301,
+        "max": 10304.309,
+        "avg": 1241.674
+      },
+      "best": {
+        "first": 4637416,
+        "last": 4637716
+      },
+      "blocksAdvanced": 300,
+      "skippedBlocks": 53,
+      "rewinds": 2,
+      "duplicateHeights": 2,
+      "parentMismatches": 0,
+      "slotIntervalMs": {
+        "n": 237,
+        "min": 1000,
+        "p50": 1000,
+        "p95": 1000,
+        "max": 1000,
+        "avg": 1000
+      },
+      "slotIntervalOverGapsMs": {
+        "n": 10,
+        "min": 1000,
+        "p50": 1000,
+        "p95": 1000,
+        "max": 1000,
+        "avg": 1000
+      },
+      "slotSanityMaxSkewSec": 10.339,
+      "undecodedHeaders": 0,
+      "babeVariants": {
+        "1": 6,
+        "3": 244
+      },
+      "authorityIndexes": {
+        "0": 12,
+        "1": 20,
+        "2": 27,
+        "3": 18,
+        "4": 22,
+        "5": 18,
+        "6": 19,
+        "7": 19,
+        "8": 22,
+        "9": 23,
+        "10": 19,
+        "11": 17,
+        "12": 14
+      },
+      "finalized": {
+        "first": 4637413,
+        "last": 4637712,
+        "skippedBlocks": 58
+      },
+      "finalityLagBlocks": {
+        "n": 242,
+        "min": -9,
+        "p50": 2,
+        "p95": 4,
+        "max": 4,
+        "avg": 1.421
+      },
+      "negativeLagCount": 24,
+      "finalizedSlotAgeSec": {
+        "n": 242,
+        "min": 3.355,
+        "p50": 5.185,
+        "p95": 6.229,
+        "max": 10.514,
+        "avg": 5.309
+      },
+      "runtimeVersionEvents": [
+        1014034
+      ]
+    },
+    "testnet": {
+      "rpcWs": "wss://testnet.flop.network/",
+      "slotDurationMs": 1000,
+      "headerHashSelfCheck": true,
+      "connectMs": 485,
+      "connectError": null,
+      "subscriptions": {
+        "newHeads": {
+          "id": "m8Ho7dmFQRY7gi4J",
+          "ms": 197.3
+        },
+        "finalizedHeads": {
+          "id": "I8Cw70m2ifFE3Xqy",
+          "ms": 198.3
+        },
+        "runtimeVersion": {
+          "id": "opKFn4TxeQW8lYdV",
+          "ms": 200
+        }
+      },
+      "closeEvents": [
+        {
+          "code": 1000,
+          "reason": "",
+          "wasClean": true,
+          "atSec": 300.2,
+          "byUs": true
+        }
+      ],
+      "errorEvents": 0,
+      "invalidMessages": 0,
+      "observedSeconds": 300.2,
+      "headEvents": 303,
+      "finalizedEvents": 288,
+      "headArrivalIntervalMs": {
+        "n": 302,
+        "min": 113.454,
+        "p50": 1000.17,
+        "p95": 1442.429,
+        "max": 1613.843,
+        "avg": 992.376
+      },
+      "finalizedArrivalIntervalMs": {
+        "n": 287,
+        "min": 134.301,
+        "p50": 1000.693,
+        "p95": 2001.185,
+        "max": 8156.176,
+        "avg": 1040.614
+      },
+      "best": {
+        "first": 107807,
+        "last": 108104
+      },
+      "blocksAdvanced": 297,
+      "skippedBlocks": 0,
+      "rewinds": 2,
+      "duplicateHeights": 1,
+      "parentMismatches": 0,
+      "slotIntervalMs": {
+        "n": 300,
+        "min": 1000,
+        "p50": 1000,
+        "p95": 1000,
+        "max": 1000,
+        "avg": 1000
+      },
+      "slotIntervalOverGapsMs": null,
+      "slotSanityMaxSkewSec": 1.409,
+      "undecodedHeaders": 0,
+      "babeVariants": {
+        "1": 7,
+        "3": 296
+      },
+      "authorityIndexes": {
+        "0": 49,
+        "1": 63,
+        "2": 51,
+        "3": 39,
+        "4": 49,
+        "5": 52
+      },
+      "finalized": {
+        "first": 107802,
+        "last": 108099,
+        "skippedBlocks": 10
+      },
+      "finalityLagBlocks": {
+        "n": 288,
+        "min": 3,
+        "p50": 4,
+        "p95": 5,
+        "max": 5,
+        "avg": 4.01
+      },
+      "negativeLagCount": 0,
+      "finalizedSlotAgeSec": {
+        "n": 288,
+        "min": 3.803,
+        "p50": 4.888,
+        "p95": 5.687,
+        "max": 6.409,
+        "avg": 4.824
+      },
+      "runtimeVersionEvents": [
+        1014035
+      ]
+    }
+  }
+}
