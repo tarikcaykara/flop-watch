@@ -70,6 +70,7 @@ functions and closures. [Decision]
 | `src/parse.ts` | Pure, tolerant parsers for `/limits`, `/health`, `/chain` and `/stats` |
 | `src/metrics.ts` | Every metric definition in one place |
 | `src/log.ts` | JSON lines to stdout |
+| `src/clock.ts` | The injectable `schedule` timer type shared by the watcher and the probes |
 
 ## 4. Data collection strategy
 
@@ -126,7 +127,8 @@ In the PoC every interval was exactly 1 s, so the histogram mainly shows when sl
 - **No retries inside a probe.** A failure is a measurement, and the next cycle is the retry.
 - **Rate limiting.** A 429 is recorded as `result="rate_limited"`. If a 429 or a 503 carries
   `Retry-After`, that probe's next run is **delayed** until Retry-After has passed, capped at
-  10 min.
+  10 min. Probes that share an endpoint (the RPC HTTP head/health and genesis loops) share the
+  pause, and a cycle sends no further request once it has been told to wait.
   - **(PoC-driven)** A 503 is **not** recorded as `rate_limited`. The Testnet faucet `/health`
     returns 503 with `Retry-After: 60` as its normal "degraded" answer, which is a valid
     measurement (see the success rules in §6).
@@ -144,6 +146,8 @@ In the PoC every interval was exactly 1 s, so the histogram mainly shows when sl
     growing.
   - On WS close, remove the best and finalized block numbers and the WS peers. Keep the
     head-received timestamps.
+  - Identity values (`genesis_match`, `chain_info`, `runtime_spec_version`) are kept until the next
+    successful check. Removing them during an outage would silence `FlopGenesisMismatch`.
 - **Schema tolerance.**
   - If a field is missing or has the wrong type, skip that metric and increment
     `flopwatch_schema_mismatch_total{network,target,field}`. The `field` label comes from a fixed
@@ -158,7 +162,11 @@ In the PoC every interval was exactly 1 s, so the histogram mainly shows when sl
 - **Isolation.**
   - Each worker catches its own errors, so a failure never affects the other network.
   - Unhandled rejections are logged, never fatal.
-  - SIGTERM closes the sockets and stops the timers within 5 s.
+  - SIGTERM stops every worker, then the metrics server. Each WebSocket gets up to 5 s to finish
+    its close (the close deadline), and the process exits with 0 within 8 s. Docker's default stop
+    timeout is 10 s.
+- **Close deadline.** A peer that never answers the WebSocket close is abandoned after 5 s, so a
+  half-open connection can delay neither a reconnect nor a shutdown.
 
 ## 6. Prometheus metric design
 
@@ -198,6 +206,9 @@ Notes:
   - Faucet `/health` succeeds when parseable JSON comes back, **whatever the HTTP status**: it
     answers 503 when degraded.
   - For every other target, success means a 2xx status, parseable JSON and no JSON-RPC error.
+  - `rpc_http` success describes the 30 s cycle: `chain_getHeader` and `system_health` both
+    succeeded. The 10-min genesis request counts in `probe_total` and `probe_duration_seconds`,
+    but not in `probe_success`.
 - **`/health` `ready` is per-client.** The faucet scopes it to "this client" (`readinessScope`). It
   was `false` on both networks while `/limits` said `open`. The panel describes it as "readiness for
   the collector's own address", not global readiness. **(PoC-driven)**

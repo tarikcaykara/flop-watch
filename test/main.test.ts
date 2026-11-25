@@ -7,6 +7,7 @@ import { createLogger } from "../src/log.ts";
 import { startMetricsServer } from "../src/main.ts";
 import { createMetrics } from "../src/metrics.ts";
 import { VERSION } from "../src/version.ts";
+import { eventually } from "./helpers.ts";
 
 const MAIN = new URL("../src/main.ts", import.meta.url).pathname;
 
@@ -119,15 +120,35 @@ describe("collector process", () => {
 		}
 	});
 
-	it("serves metrics, then exits with 0 within 5 s of SIGTERM", { timeout: 15_000 }, async () => {
+	it("runs a worker per network, serves metrics, then exits with 0 within 5 s of SIGTERM", {
+		timeout: 20_000,
+	}, async () => {
 		const port = await freePort();
+		const unreachable = await freePort(); // closed: the workers fail fast, nothing leaves the host
 		const { child, started: ready } = runCollector({
 			FLOPWATCH_HOST: "127.0.0.1",
 			FLOPWATCH_PORT: String(port),
+			FLOPWATCH_NETWORKS: "testnet",
+			FLOPWATCH_TESTNET_RPC_WS: `ws://127.0.0.1:${unreachable}`,
+			FLOPWATCH_TESTNET_RPC_HTTP: `http://127.0.0.1:${unreachable}`,
+			FLOPWATCH_TESTNET_FAUCET_URL: "",
+			FLOPWATCH_TESTNET_EXPLORER_API_URL: "",
 		});
 		try {
 			await ready;
 			assert.equal((await fetch(`http://127.0.0.1:${port}/healthz`)).status, 200);
+			const series = (target: string) =>
+				`flopwatch_probe_total{network="testnet",target="${target}",result="network_error"}`;
+			const scrape = async () => (await fetch(`http://127.0.0.1:${port}/metrics`)).text();
+			// The HTTP probes start after up to 5 s of jitter; a closed port fails at once.
+			await eventually(
+				async () => {
+					const body = await scrape();
+					return body.includes(series("rpc_ws")) && body.includes(series("rpc_http"));
+				},
+				"chain watcher and HTTP probes running",
+				8_000,
+			);
 
 			const exited = once(child, "exit");
 			const started = Date.now();

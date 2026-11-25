@@ -20,6 +20,7 @@ import { PROFILES } from "../src/config.ts";
 import { createLogger } from "../src/log.ts";
 import { createMetrics, type Metrics } from "../src/metrics.ts";
 import { REQUEST_TIMEOUT_MS } from "../src/rpc-http.ts";
+import { eventually, type ManualClock, manualClock, sample } from "./helpers.ts";
 
 interface Fixtures {
 	networks: Record<string, { babeConfiguration: string; headers: Array<{ header: RpcHeader }> }>;
@@ -135,67 +136,12 @@ async function silentTcpServer() {
 	};
 }
 
-/** A manual clock for the watcher's timers: nothing fires until the test advances it. */
-function manualClock() {
-	let now = 0;
-	let nextId = 0;
-	const tasks = new Map<number, { at: number; fn: () => void }>();
-	return {
-		schedule: (ms: number, fn: () => void) => {
-			const id = ++nextId;
-			tasks.set(id, { at: now + ms, fn });
-			return () => tasks.delete(id);
-		},
-		advance(ms: number) {
-			const until = now + ms;
-			for (;;) {
-				const due = [...tasks]
-					.filter(([, task]) => task.at <= until)
-					.sort((a, b) => a[1].at - b[1].at || a[0] - b[0])[0];
-				if (!due) break;
-				tasks.delete(due[0]);
-				now = due[1].at;
-				due[1].fn();
-			}
-			now = until;
-		},
-	};
-}
-
-/** Lets socket I/O run until `check` passes, for at most 5 s of real time; never uses the clock. */
-async function eventually(check: () => boolean | Promise<boolean>, what: string): Promise<void> {
-	const deadline = performance.now() + 5_000;
-	while (performance.now() < deadline) {
-		if (await check()) return;
-		await new Promise((resolve) => setImmediate(resolve));
-	}
-	throw new Error(`never happened: ${what}`);
-}
-
-interface Sample {
-	value: number;
-	labels: Record<string, string | number>;
-	metricName?: string;
-}
-async function sample(
-	metric: { get(): Promise<{ values: Sample[] }> },
-	labels: Record<string, string> = {},
-	metricName?: string,
-): Promise<number | undefined> {
-	const { values } = await metric.get();
-	return values.find(
-		(v) =>
-			(metricName === undefined || v.metricName === metricName) &&
-			Object.entries(labels).every(([k, value]) => v.labels[k] === value),
-	)?.value;
-}
-
 const net = { network: "testnet" };
 const blockNumber = (n: number) => `0x${n.toString(16)}`;
 
 describe("chain watcher", () => {
 	let metrics: Metrics;
-	let clock: ReturnType<typeof manualClock>;
+	let clock: ManualClock;
 	let logs: Array<Record<string, unknown>>;
 	let watcher: ChainWatcher | undefined;
 	const cleanups: Array<() => void> = [];
