@@ -44,10 +44,10 @@ flowchart LR
 | Type check | `tsc --noEmit` | Type checking only, never emitting |
 | Modules / package manager | ESM, pnpm | Maintainer's standard |
 | Runtime dependency | **`@prometheus-io/client` only** | Metric types, the registry and default process metrics. It is `prom-client` moved to the Prometheus organisation; `prom-client` is deprecated on npm in its favour (2026-08). Same Apache-2.0 licence and transitive dependencies. |
-| Dev dependencies | `typescript`, `@types/node`, `@biomejs/biome` | Type check, lint and format |
+| Dev dependencies | `typescript`, `@types/node`, `@biomejs/biome`, `ws` (+ `@types/ws`) | Type check, lint and format; `ws` serves the fake RPC node in the chain-watcher tests, because Node has a WebSocket client but no server |
 | Chain transport | Global `fetch` and `WebSocket`, raw JSON-RPC 2.0 | Verified in the PoC. Uses the legacy `chain_subscribeNewHeads`, `chain_subscribeFinalizedHeads` and `state_subscribeRuntimeVersion`, which were accepted on both networks with no drop in 300 s |
 | HTTP server | `node:http` | One route (`/metrics`) plus `/healthz`; no framework needed |
-| Tests | `node:test` with recorded fixtures from `poc/results` | No test framework dependency |
+| Tests | `node:test` with recorded fixtures from `poc/results` | No test framework dependency. Timers are injected (`schedule` option) and driven by a manual clock: `node:test`'s timer mocks interfere with the built-in WebSocket client across tests |
 | Storage / visualisation | Prometheus + Grafana, official images pinned to exact versions at M3 | Standard, self-hostable, no custom code |
 | Deployment | Docker Compose | One file runs both the public instance and self-hosting |
 | CI | GitHub Actions | Free for public repos |

@@ -50,7 +50,7 @@ code, comments, docs, commits, issues and PRs.
 | Metrics | `@prometheus-io/client` (only runtime dependency) |
 | Transport | Global `fetch` and `WebSocket`, raw JSON-RPC 2.0 |
 | HTTP server | `node:http` |
-| Tests | `node:test`, offline, with recorded fixtures |
+| Tests | `node:test`, offline, with recorded fixtures; `ws` (dev only) as the fake RPC node; timers injected, never mocked globally |
 | Lint / format | Biome |
 | Stack | Prometheus + Grafana, Docker Compose |
 
