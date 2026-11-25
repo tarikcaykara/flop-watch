@@ -365,7 +365,8 @@ mirror. [Decision]
 ## 11. Security
 
 - **Read-only by construction.** No keys, no signing, and no POST to the faucet or the gateway.
-  Faucet and explorer probes are GET-only, with fixed paths.
+  Faucet and explorer probes are GET-only, with fixed paths. Redirects are never followed, so no
+  request reaches a host that is not configured; a 3xx is recorded as `http_error`.
 - **RPC method allowlist.** Enforced in `rpc-http.ts` and `chain-watcher.ts`; anything else throws
   before a request is sent. It allows:
   - `chain_getBlockHash`, `chain_getHeader`, `chain_getFinalizedHead`;
