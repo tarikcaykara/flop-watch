@@ -2,7 +2,6 @@
 // new-head / finalized-head / runtime-version subscriptions, a system_health ping as the rpc_ws
 // probe, a stall watchdog and reconnects with exponential backoff and full jitter.
 
-import { once } from "node:events";
 import {
 	type BabePreDigest,
 	babeFromHeader,
@@ -21,8 +20,19 @@ export const WATCHDOG_MS = 30_000;
 export const HEALTH_INTERVAL_MS = 30_000;
 export const BACKOFF_BASE_MS = 1_000;
 export const BACKOFF_MAX_MS = 60_000;
+/** Full jitter can draw 0; this floor keeps a flapping endpoint from a tight reconnect loop. */
+export const BACKOFF_MIN_MS = 100;
 export const STABLE_RESET_MS = 5 * 60_000;
+/** A peer that never answers the closing handshake must not keep a session alive. */
+export const CLOSE_DEADLINE_MS = 5_000;
 const GENESIS_RE = /^0x[0-9a-f]{64}$/;
+
+const SUBSCRIPTIONS = [
+	["chain_subscribeNewHeads", "newHead"],
+	["chain_subscribeFinalizedHeads", "finalizedHead"],
+	["state_subscribeRuntimeVersion", "runtimeVersion"],
+] as const;
+type SubscriptionKind = (typeof SUBSCRIPTIONS)[number][1];
 
 /** Remote fields this module can report in flopwatch_schema_mismatch_total. */
 type WsField =
@@ -32,6 +42,7 @@ type WsField =
 	| "chain"
 	| "runtime_version"
 	| "babe_configuration"
+	| "subscription"
 	| "health";
 
 type Outcome =
@@ -53,7 +64,10 @@ const realSchedule: Schedule = (ms, fn) => {
 const noop = () => {};
 
 export interface ChainWatcher {
-	/** Stops reconnecting and closes the connection; resolves once the socket has closed. */
+	/**
+	 * Stops reconnecting and closes the connection. Resolves once the session has ended: when the
+	 * socket closes, or after CLOSE_DEADLINE_MS if the peer never completes the close.
+	 */
 	readonly stop: () => Promise<void>;
 }
 
@@ -77,8 +91,11 @@ export function startChainWatcher(options: {
 
 	let stopped = false;
 	let attempt = 0;
-	let socket: WebSocket | null = null;
 	let cancelReconnect = noop;
+	let session: {
+		readonly close: (code: number, text: string) => void;
+		readonly ended: Promise<void>;
+	} | null = null;
 	let chainInfoLabels: Record<"network" | "chain" | "spec_name" | "genesis_hash", string> | null =
 		null;
 
@@ -95,7 +112,7 @@ export function startChainWatcher(options: {
 	function scheduleReconnect(): void {
 		const ceiling = Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** attempt);
 		attempt++;
-		const delay = Math.floor(random() * ceiling);
+		const delay = Math.max(BACKOFF_MIN_MS, Math.floor(random() * ceiling));
 		log.info("ws reconnect scheduled", { network: network.name, attempt, delayMs: delay });
 		cancelReconnect = schedule(delay, connect);
 	}
@@ -104,23 +121,77 @@ export function startChainWatcher(options: {
 		if (stopped) return;
 		log.debug("ws connecting", { network: network.name, url: network.rpcWs });
 		const ws = new WebSocket(network.rpcWs, { headers: { "user-agent": USER_AGENT } });
-		socket = ws;
 		let opened = false;
 		let subscribed = false;
+		let failed = false;
+		/** Set once a close is initiated or has happened: from then on nothing may write metrics. */
+		let closing = false;
+		let ended = false;
 		let reason: DisconnectReason = "close";
 		let connectTimedOut = false;
 		let nextId = 0;
 		const pending = new Map<number, Pending>();
+		const subscriptions = new Map<string, SubscriptionKind>();
 		let prev: { n: number; hash: string; babe: BabePreDigest | null } | null = null;
 		let slotDurationMs: number | null = null;
 		let cancelWatchdog = noop;
 		let cancelHealth = noop;
 		let cancelStable = noop;
+		let cancelDeadline = noop;
 		let pinging = false;
+		const { promise: endedPromise, resolve: markEnded } = Promise.withResolvers<void>();
+
+		/** Ends the session exactly once, from the close event or from the close deadline. */
+		const onEnded = (code: number) => {
+			if (ended) return;
+			ended = true;
+			closing = true;
+			cancelConnect();
+			cancelWatchdog();
+			cancelStable();
+			cancelHealth();
+			cancelDeadline();
+			for (const entry of pending.values()) {
+				entry.cancelTimeout();
+				entry.resolve({ ok: false, result: "network_error", error: "connection closed" });
+			}
+			pending.clear();
+			if (session?.ended === endedPromise) session = null;
+			markEnded();
+			if (stopped) return;
+
+			metrics.wsConnected.set(byNetwork, 0);
+			metrics.bestBlock.remove(byNetwork);
+			metrics.finalizedBlock.remove(byNetwork);
+			metrics.nodePeers.remove(wsTransport);
+			metrics.nodeIsSyncing.remove(wsTransport);
+			if (!opened) {
+				recordProbe(connectTimedOut ? "timeout" : "network_error", null);
+				log.warn("ws connect failed", { network: network.name, timedOut: connectTimedOut });
+			} else {
+				metrics.wsDisconnects.inc({ ...byNetwork, reason });
+				if (subscribed) metrics.probeSuccess.set(probe, 0);
+				else if (!failed) recordProbe("network_error", null); // closed during setup
+				log.warn("ws closed", { network: network.name, reason, code });
+			}
+			scheduleReconnect();
+		};
+
+		/** Starts the closing handshake; a peer that never finishes it is given up after a deadline. */
+		const closeSocket = (code: number, text: string) => {
+			if (closing) return;
+			closing = true;
+			ws.close(code, text);
+			cancelDeadline = schedule(CLOSE_DEADLINE_MS, () => {
+				log.warn("ws close not acknowledged, abandoning the socket", { network: network.name });
+				onEnded(1006);
+			});
+		};
+		session = { close: closeSocket, ended: endedPromise };
 
 		const cancelConnect = schedule(REQUEST_TIMEOUT_MS, () => {
 			connectTimedOut = true;
-			ws.close();
+			closeSocket(1000, "connect timeout");
 		});
 
 		const request = (method: string, params: readonly unknown[] = []): Promise<Outcome> => {
@@ -141,42 +212,50 @@ export function startChainWatcher(options: {
 			cancelWatchdog = schedule(WATCHDOG_MS, () => {
 				reason = "stall_timeout";
 				log.warn("no new head, reconnecting", { network: network.name, afterMs: WATCHDOG_MS });
-				ws.close(4000, "stall_timeout");
+				closeSocket(4000, "stall_timeout");
 			});
 		};
 
 		const ping = async () => {
-			if (pinging) return;
+			if (pinging || closing) return;
 			pinging = true;
 			const started = performance.now();
 			const outcome = await request("system_health");
 			pinging = false;
+			if (closing) return;
 			const seconds = (performance.now() - started) / 1000;
-			if (!outcome.ok) {
-				recordProbe(outcome.result, seconds);
-				log.warn("ws health ping failed", { network: network.name, error: outcome.error });
-				return;
-			}
-			const { value } = outcome;
-			if (!isObject(value) || !("peers" in value) || !("isSyncing" in value)) {
-				mismatch("health");
-				recordProbe("invalid_response", seconds);
+			const health = outcome.ok ? outcome.value : undefined;
+			if (!outcome.ok || !isObject(health) || !("peers" in health) || !("isSyncing" in health)) {
+				metrics.nodePeers.remove(wsTransport);
+				metrics.nodeIsSyncing.remove(wsTransport);
+				if (outcome.ok) mismatch("health");
+				recordProbe(outcome.ok ? "invalid_response" : outcome.result, seconds);
+				if (!outcome.ok)
+					log.warn("ws health ping failed", { network: network.name, error: outcome.error });
 				return;
 			}
 			recordProbe("ok", seconds);
-			if (typeof value.peers === "number") metrics.nodePeers.set(wsTransport, value.peers);
-			if (typeof value.isSyncing === "boolean")
-				metrics.nodeIsSyncing.set(wsTransport, value.isSyncing ? 1 : 0);
+			if (typeof health.peers === "number") metrics.nodePeers.set(wsTransport, health.peers);
+			else {
+				mismatch("health");
+				metrics.nodePeers.remove(wsTransport);
+			}
+			if (typeof health.isSyncing === "boolean") {
+				metrics.nodeIsSyncing.set(wsTransport, health.isSyncing ? 1 : 0);
+			} else {
+				mismatch("health");
+				metrics.nodeIsSyncing.remove(wsTransport);
+			}
 		};
 
 		const fail = (result: Exclude<ProbeResult, "ok">, field: WsField | null, error: string) => {
-			// A request that failed because the socket closed was already handled by the close event.
-			if (ws.readyState !== WebSocket.OPEN) return;
+			if (closing) return;
+			failed = true;
 			if (field) mismatch(field);
 			recordProbe(result, null);
 			log.warn("ws identity or subscription failed", { network: network.name, result, error });
 			reason = "error";
-			ws.close();
+			closeSocket(1000, "setup failed");
 		};
 
 		const initialise = async () => {
@@ -186,16 +265,18 @@ export function startChainWatcher(options: {
 				request("state_getRuntimeVersion"),
 				request("state_call", ["BabeApi_configuration", "0x"]),
 			]);
+			if (closing) return;
 			if (!genesis.ok || !chain.ok || !runtime.ok || !babe.ok) {
-				const failed = [genesis, chain, runtime, babe].find((outcome) => !outcome.ok);
-				if (failed && !failed.ok) fail(failed.result, null, failed.error);
+				const failure = [genesis, chain, runtime, babe].find((outcome) => !outcome.ok);
+				if (failure && !failure.ok) fail(failure.result, null, failure.error);
 				return;
 			}
 			if (typeof genesis.value !== "string" || !GENESIS_RE.test(genesis.value)) {
 				return fail("invalid_response", "genesis", "chain_getBlockHash [0] is not a 32-byte hash");
 			}
-			if (typeof chain.value !== "string")
+			if (typeof chain.value !== "string") {
 				return fail("invalid_response", "chain", "system_chain is not a string");
+			}
 			const rv = runtime.value;
 			if (!isObject(rv) || !("specName" in rv) || !("specVersion" in rv)) {
 				return fail("invalid_response", "runtime_version", "state_getRuntimeVersion has no spec");
@@ -236,13 +317,15 @@ export function startChainWatcher(options: {
 				});
 			}
 
-			for (const method of [
-				"chain_subscribeNewHeads",
-				"chain_subscribeFinalizedHeads",
-				"state_subscribeRuntimeVersion",
-			]) {
+			for (const [method, kind] of SUBSCRIPTIONS) {
 				const outcome = await request(method);
+				if (closing) return;
 				if (!outcome.ok) return fail(outcome.result, null, `${method}: ${outcome.error}`);
+				const id = outcome.value;
+				if (!((typeof id === "string" && id !== "") || typeof id === "number")) {
+					return fail("invalid_response", "subscription", `${method} returned no subscription id`);
+				}
+				subscriptions.set(String(id), kind);
 			}
 			subscribed = true;
 			metrics.wsConnected.set(byNetwork, 1);
@@ -317,6 +400,7 @@ export function startChainWatcher(options: {
 		};
 
 		ws.addEventListener("open", () => {
+			if (closing) return;
 			opened = true;
 			cancelConnect();
 			metrics.wsConnects.inc(byNetwork);
@@ -325,6 +409,7 @@ export function startChainWatcher(options: {
 		});
 
 		ws.addEventListener("message", (event: MessageEvent) => {
+			if (closing) return;
 			let message: unknown;
 			try {
 				message = JSON.parse(typeof event.data === "string" ? event.data : "");
@@ -348,45 +433,21 @@ export function startChainWatcher(options: {
 				}
 				return;
 			}
-			if (!("method" in message) || !("params" in message) || !isObject(message.params)) return;
-			const result = "result" in message.params ? message.params.result : undefined;
-			if (message.method === "chain_newHead") onNewHead(result);
-			else if (message.method === "chain_finalizedHead") onFinalizedHead(result);
-			else if (message.method === "state_runtimeVersion") onRuntimeVersion(result);
+			if (!("params" in message) || !isObject(message.params)) return;
+			const { params } = message;
+			const id = "subscription" in params ? String(params.subscription) : "";
+			const result = "result" in params ? params.result : undefined;
+			const kind = subscriptions.get(id);
+			if (kind === "newHead") onNewHead(result);
+			else if (kind === "finalizedHead") onFinalizedHead(result);
+			else if (kind === "runtimeVersion") onRuntimeVersion(result);
 		});
 
 		ws.addEventListener("error", () => {
 			if (reason === "close") reason = "error";
 		});
 
-		ws.addEventListener("close", (event: CloseEvent) => {
-			cancelConnect();
-			cancelWatchdog();
-			cancelStable();
-			cancelHealth();
-			for (const entry of pending.values()) {
-				entry.cancelTimeout();
-				entry.resolve({ ok: false, result: "network_error", error: "connection closed" });
-			}
-			pending.clear();
-			if (socket === ws) socket = null;
-			if (stopped) return;
-
-			metrics.wsConnected.set(byNetwork, 0);
-			metrics.bestBlock.remove(byNetwork);
-			metrics.finalizedBlock.remove(byNetwork);
-			metrics.nodePeers.remove(wsTransport);
-			metrics.nodeIsSyncing.remove(wsTransport);
-			if (opened) {
-				metrics.wsDisconnects.inc({ ...byNetwork, reason });
-				if (subscribed) metrics.probeSuccess.set(probe, 0);
-				log.warn("ws closed", { network: network.name, reason, code: event.code });
-			} else {
-				recordProbe(connectTimedOut ? "timeout" : "network_error", null);
-				log.warn("ws connect failed", { network: network.name, timedOut: connectTimedOut });
-			}
-			scheduleReconnect();
-		});
+		ws.addEventListener("close", (event: CloseEvent) => onEnded(event.code));
 	}
 
 	connect();
@@ -394,12 +455,12 @@ export function startChainWatcher(options: {
 		stop: async () => {
 			stopped = true;
 			cancelReconnect();
+			const current = session;
+			if (current) {
+				current.close(1000, "shutdown");
+				await current.ended;
+			}
 			metrics.wsConnected.set(byNetwork, 0);
-			const ws = socket;
-			if (!ws || ws.readyState === WebSocket.CLOSED) return;
-			const closed = once(ws, "close");
-			ws.close(1000, "shutdown");
-			await closed;
 		},
 	};
 }
