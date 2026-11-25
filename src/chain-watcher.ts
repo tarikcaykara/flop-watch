@@ -177,15 +177,21 @@ export function startChainWatcher(options: {
 			scheduleReconnect();
 		};
 
-		/** Starts the closing handshake; a peer that never finishes it is given up after a deadline. */
+		/**
+		 * Starts the closing handshake; a peer that never finishes it is given up after a deadline.
+		 * The global WebSocket has no terminate(), so an abandoned socket lingers until the OS drops
+		 * it, but the session (metrics, reconnect, stop()) no longer waits for it.
+		 */
 		const closeSocket = (code: number, text: string) => {
 			if (closing) return;
 			closing = true;
-			ws.close(code, text);
+			// Scheduled first: closing a CONNECTING socket ends the session synchronously, and
+			// onEnded must be able to cancel the deadline.
 			cancelDeadline = schedule(CLOSE_DEADLINE_MS, () => {
 				log.warn("ws close not acknowledged, abandoning the socket", { network: network.name });
 				onEnded(1006);
 			});
+			ws.close(code, text);
 		};
 		session = { close: closeSocket, ended: endedPromise };
 
@@ -210,6 +216,7 @@ export function startChainWatcher(options: {
 		const resetWatchdog = () => {
 			cancelWatchdog();
 			cancelWatchdog = schedule(WATCHDOG_MS, () => {
+				if (closing) return;
 				reason = "stall_timeout";
 				log.warn("no new head, reconnecting", { network: network.name, afterMs: WATCHDOG_MS });
 				closeSocket(4000, "stall_timeout");

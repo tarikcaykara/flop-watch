@@ -442,16 +442,44 @@ describe("chain watcher", () => {
 		assert.equal(await sample(metrics.nodePeers, { transport: "ws" }), undefined);
 	});
 
-	it("records a handshake that never completes as a connect timeout", async () => {
+	it("records a handshake that never completes as a connect timeout, without the close deadline", async () => {
 		const server = await silentTcpServer();
 		cleanups.push(() => server.close());
 		watch(server.url);
-		clock.advance(REQUEST_TIMEOUT_MS + CLOSE_DEADLINE_MS);
+		clock.advance(REQUEST_TIMEOUT_MS);
 		await eventually(
 			async () => (await sample(metrics.probeTotal, { target: "rpc_ws", result: "timeout" })) === 1,
 			"connect timeout",
 		);
 		assert.equal(await sample(metrics.wsConnects, net), undefined);
+		clock.advance(CLOSE_DEADLINE_MS);
+		assert.equal(
+			logs.some((l) => l["msg"] === "ws close not acknowledged, abandoning the socket"),
+			false,
+			"the deadline of an already ended session is cancelled",
+		);
+	});
+
+	it("stop() during the handshake resolves at once, and twice is harmless", async () => {
+		const server = await silentTcpServer();
+		cleanups.push(() => server.close());
+		const current = watch(server.url);
+		await Promise.all([current.stop(), current.stop()]);
+		clock.advance(60_000);
+		assert.equal(connectAttempts(), 1);
+		assert.equal(await sample(metrics.wsConnected, net), 0);
+	});
+
+	it("counts a connection lost during setup as an rpc_ws probe failure", async () => {
+		const node = await start({ silent: ["system_chain"] });
+		await eventually(() => node.state.methods.includes("system_chain"), "identity reads sent");
+		node.dropConnections();
+		await eventually(
+			async () =>
+				(await sample(metrics.probeTotal, { target: "rpc_ws", result: "network_error" })) === 1,
+			"setup failure",
+		);
+		assert.equal(await sample(metrics.wsConnected, net), 0);
 	});
 
 	it("closes and retries when an identity read or a subscription is refused", async () => {
@@ -501,5 +529,12 @@ describe("chain watcher", () => {
 		await stopping;
 		assert.equal(await sample(metrics.wsConnected, net), 0);
 		assert.equal(connectAttempts(), 1);
+	});
+
+	it("stop() on an open session resolves through the real close handshake", async () => {
+		const node = await start();
+		await subscribedOn(node, 1);
+		await watcher?.stop(); // no clock advance: the peer acknowledges the close
+		assert.equal(await sample(metrics.wsConnected, net), 0);
 	});
 });
