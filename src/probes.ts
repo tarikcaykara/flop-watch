@@ -71,24 +71,31 @@ export function startLoop(
 	};
 }
 
+/** Remote fields the HTTP RPC probes can report in flopwatch_schema_mismatch_total. */
+type RpcHttpField = "header" | "health" | "genesis";
+
 /**
  * The HTTP JSON-RPC probes of one network: `chain_getHeader` + `system_health` every 30 s
  * (the rpc_http probe), and `chain_getBlockHash [0]` every 10 min for the genesis check.
+ * Both loops share one Retry-After pause, because they hit the same endpoint.
  */
 export function startHttpRpcProbes(
 	options: { network: NetworkConfig; metrics: Metrics } & LoopOptions,
 ): ProbeLoop {
 	const { network, metrics, log } = options;
+	const now = options.now ?? (() => performance.now());
 	const byNetwork = { network: network.name };
 	const target = { network: network.name, target: "rpc_http" } as const;
 	const httpTransport = { network: network.name, transport: "http" } as const;
+	let stopped = false;
+	let pausedUntil = 0;
 
 	/** Records one request; `valid` is false when an ok answer had the wrong shape. */
 	const record = (
 		method: string,
 		outcome: RpcOutcome,
 		valid: boolean,
-		field: string,
+		field: RpcHttpField,
 	): ProbeResult => {
 		const result: ProbeResult =
 			outcome.result === "ok" && !valid ? "invalid_response" : outcome.result;
@@ -110,8 +117,18 @@ export function startHttpRpcProbes(
 	const retryAfter = (outcome: RpcOutcome) =>
 		outcome.result === "ok" ? null : outcome.retryAfterMs;
 
+	/** Runs `run` unless the endpoint asked us to wait; a Retry-After pauses both loops. */
+	const paced = (run: () => Promise<number | null>) => async (): Promise<number | null> => {
+		const wait = pausedUntil - now();
+		if (wait > 0) return wait;
+		const retry = await run();
+		if (retry !== null) pausedUntil = now() + Math.min(retry, RETRY_AFTER_CAP_MS);
+		return retry;
+	};
+
 	const headAndHealth = async (): Promise<number | null> => {
 		const header = await rpcCall(network.rpcHttp, "chain_getHeader");
+		if (stopped) return null;
 		let best: number | null = null;
 		if (header.result === "ok" && isRpcHeader(header.value)) {
 			try {
@@ -124,8 +141,9 @@ export function startHttpRpcProbes(
 		if (best === null) metrics.httpBestBlock.remove(byNetwork);
 		else metrics.httpBestBlock.set(byNetwork, best);
 
-		// A rate-limited endpoint gets no second request in the same cycle.
-		if (headerResult === "rate_limited") {
+		// An endpoint that asked us to wait (429, or a Retry-After on any error) gets no second
+		// request in the same cycle.
+		if (headerResult === "rate_limited" || retryAfter(header) !== null) {
 			metrics.probeSuccess.set(target, 0);
 			metrics.nodePeers.remove(httpTransport);
 			metrics.nodeIsSyncing.remove(httpTransport);
@@ -133,6 +151,7 @@ export function startHttpRpcProbes(
 		}
 
 		const health = await rpcCall(network.rpcHttp, "system_health");
+		if (stopped) return null;
 		const value = health.result === "ok" ? health.value : undefined;
 		const peers =
 			typeof value === "object" &&
@@ -162,29 +181,39 @@ export function startHttpRpcProbes(
 		const ok = headerResult === "ok" && healthResult === "ok";
 		metrics.probeSuccess.set(target, ok ? 1 : 0);
 		if (ok) metrics.probeLastSuccess.set(target, Date.now() / 1000);
-		const waits = [retryAfter(header), retryAfter(health)].filter((ms) => ms !== null);
-		return waits.length > 0 ? Math.max(...waits) : null;
+		return retryAfter(health);
 	};
 
+	/**
+	 * Genesis requests count in probe_total and probe_duration, but not in probe_success, which
+	 * describes the 30 s head/health cycle. A failed check keeps the last genesis_match value: it
+	 * is identity, re-evaluated on the next check, and removing it would silence
+	 * FlopGenesisMismatch during an outage.
+	 */
 	const genesis = async (): Promise<number | null> => {
 		const outcome = await rpcCall(network.rpcHttp, "chain_getBlockHash", [0]);
+		if (stopped) return null;
 		const hash =
 			outcome.result === "ok" && typeof outcome.value === "string" && GENESIS_RE.test(outcome.value)
 				? outcome.value
 				: null;
 		record("chain_getBlockHash", outcome, hash !== null, "genesis");
-		const labels = { ...byNetwork, source: "rpc_http" } as const;
-		if (hash === null) metrics.genesisMatch.remove(labels);
-		else metrics.genesisMatch.set(labels, hash === network.expectedGenesis ? 1 : 0);
+		if (hash !== null) {
+			metrics.genesisMatch.set(
+				{ ...byNetwork, source: "rpc_http" },
+				hash === network.expectedGenesis ? 1 : 0,
+			);
+		}
 		return retryAfter(outcome);
 	};
 
 	const loops = [
-		startLoop(`${network.name} rpc_http`, RPC_HTTP_INTERVAL_MS, headAndHealth, options),
-		startLoop(`${network.name} genesis`, GENESIS_INTERVAL_MS, genesis, options),
+		startLoop(`${network.name} rpc_http`, RPC_HTTP_INTERVAL_MS, paced(headAndHealth), options),
+		startLoop(`${network.name} genesis`, GENESIS_INTERVAL_MS, paced(genesis), options),
 	];
 	return {
 		stop: async () => {
+			stopped = true;
 			await Promise.all(loops.map((loop) => loop.stop()));
 		},
 	};

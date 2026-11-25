@@ -7,6 +7,7 @@ import { createLogger } from "../src/log.ts";
 import { startMetricsServer } from "../src/main.ts";
 import { createMetrics } from "../src/metrics.ts";
 import { VERSION } from "../src/version.ts";
+import { eventually } from "./helpers.ts";
 
 const MAIN = new URL("../src/main.ts", import.meta.url).pathname;
 
@@ -120,7 +121,7 @@ describe("collector process", () => {
 	});
 
 	it("runs a worker per network, serves metrics, then exits with 0 within 5 s of SIGTERM", {
-		timeout: 15_000,
+		timeout: 20_000,
 	}, async () => {
 		const port = await freePort();
 		const unreachable = await freePort(); // closed: the workers fail fast, nothing leaves the host
@@ -136,14 +137,18 @@ describe("collector process", () => {
 		try {
 			await ready;
 			assert.equal((await fetch(`http://127.0.0.1:${port}/healthz`)).status, 200);
-			const wsFailure =
-				'flopwatch_probe_total{network="testnet",target="rpc_ws",result="network_error"}';
-			let body = "";
-			const deadline = Date.now() + 5_000;
-			while (!body.includes(wsFailure) && Date.now() < deadline) {
-				body = await (await fetch(`http://127.0.0.1:${port}/metrics`)).text();
-			}
-			assert.ok(body.includes(wsFailure), "the testnet chain watcher is running");
+			const series = (target: string) =>
+				`flopwatch_probe_total{network="testnet",target="${target}",result="network_error"}`;
+			const scrape = async () => (await fetch(`http://127.0.0.1:${port}/metrics`)).text();
+			// The HTTP probes start after up to 5 s of jitter; a closed port fails at once.
+			await eventually(
+				async () => {
+					const body = await scrape();
+					return body.includes(series("rpc_ws")) && body.includes(series("rpc_http"));
+				},
+				"chain watcher and HTTP probes running",
+				8_000,
+			);
 
 			const exited = once(child, "exit");
 			const started = Date.now();

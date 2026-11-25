@@ -58,6 +58,14 @@ describe("startLoop", () => {
 		assert.deepEqual(starts, [2_500, 32_500, 62_500]);
 	});
 
+	it("keeps the first run within the 5 s jitter window", () => {
+		runLoop(recordingRun, 0.9999);
+		clock.advance(4_998);
+		assert.deepEqual(starts, []);
+		clock.advance(1);
+		assert.deepEqual(starts, [4_999]);
+	});
+
 	it("never overlaps: a run that outlasts the interval skips the missed slots", async () => {
 		const { promise: slowRun, resolve: finishSlowRun } = Promise.withResolvers<number | null>();
 		let calls = 0;
@@ -211,13 +219,27 @@ describe("startHttpRpcProbes", () => {
 		);
 	});
 
-	it("reports a genesis mismatch and removes the value when the answer is unusable", async () => {
+	it("reports a genesis mismatch, and keeps the last value when a later check fails", async () => {
 		results["chain_getBlockHash"] = PROFILES.devnet.expectedGenesis;
 		try {
 			startProbes();
 			await eventually(
 				async () => (await sample(metrics.genesisMatch, { source: "rpc_http" })) === 0,
 				"mismatch",
+			);
+			await settle();
+			answer = (method, res) =>
+				method === "chain_getBlockHash" ? res.writeHead(502).end() : healthy(method, res);
+			clock.advance(GENESIS_INTERVAL_MS);
+			await eventually(
+				() => received.filter((m) => m === "chain_getBlockHash").length === 2,
+				"recheck",
+			);
+			await settle();
+			assert.equal(
+				await sample(metrics.genesisMatch, { source: "rpc_http" }),
+				0,
+				"kept, alert keeps firing",
 			);
 		} finally {
 			results["chain_getBlockHash"] = PROFILES.testnet.expectedGenesis;
@@ -280,5 +302,46 @@ describe("startHttpRpcProbes", () => {
 			() => received.filter((m) => m === "chain_getHeader").length === 2,
 			"request after Retry-After",
 		);
+	});
+
+	it("treats a 503 with Retry-After as http_error, but still waits before the next request", async () => {
+		answer = (method, res) =>
+			method === "chain_getHeader"
+				? res.writeHead(503, { "retry-after": "90" }).end("busy")
+				: healthy(method, res);
+		startProbes();
+		await eventually(
+			async () => (await sample(metrics.probeTotal, { ...target, result: "http_error" })) === 1,
+			"503",
+		);
+		await settle();
+		assert.equal(received.filter((m) => m === "system_health").length, 0, "no second request");
+		clock.advance(60_000);
+		await settle();
+		assert.equal(received.filter((m) => m === "chain_getHeader").length, 1);
+		clock.advance(30_000);
+		await eventually(
+			() => received.filter((m) => m === "chain_getHeader").length === 2,
+			"after 90 s",
+		);
+	});
+
+	it("pauses both loops when either is told to wait", async () => {
+		answer = (method, res) =>
+			method === "chain_getBlockHash"
+				? res.writeHead(429, { "retry-after": "120" }).end()
+				: healthy(method, res);
+		startProbes();
+		await eventually(
+			async () => (await sample(metrics.probeTotal, { ...target, result: "rate_limited" })) === 1,
+			"genesis rate limited",
+		);
+		await eventually(async () => (await sample(metrics.probeSuccess, target)) === 1, "first cycle");
+		await settle();
+		clock.advance(RPC_HTTP_INTERVAL_MS);
+		await settle();
+		assert.equal(received.filter((m) => m === "chain_getHeader").length, 1, "paused at 30 s");
+		clock.advance(120_000 - RPC_HTTP_INTERVAL_MS);
+		await eventually(() => received.filter((m) => m === "chain_getHeader").length === 2, "resumed");
 	});
 });

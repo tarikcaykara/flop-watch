@@ -36,12 +36,13 @@ export function manualClock(): ManualClock {
 	};
 }
 
-/** Lets I/O and promises run until `check` passes, for at most 5 s of real time; never uses a clock. */
+/** Lets I/O and promises run until `check` passes, within `timeoutMs` of real time; never uses a clock. */
 export async function eventually(
 	check: () => boolean | Promise<boolean>,
 	what: string,
+	timeoutMs = 5_000,
 ): Promise<void> {
-	const deadline = performance.now() + 5_000;
+	const deadline = performance.now() + timeoutMs;
 	while (performance.now() < deadline) {
 		if (await check()) return;
 		await new Promise((resolve) => setImmediate(resolve));
