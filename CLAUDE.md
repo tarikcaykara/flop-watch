@@ -66,11 +66,12 @@ pnpm install
 pnpm check        # biome ci .
 pnpm typecheck    # tsc --noEmit
 pnpm test         # node --test
+pnpm audit:deps   # pnpm audit --audit-level=moderate, from #24
 node src/main.ts  # collector, from #4
 ```
 
-The gate is `pnpm check && pnpm typecheck && pnpm test`. Run it before every push; CI runs the
-same.
+The gate is `pnpm check && pnpm typecheck && pnpm test && pnpm audit:deps`. Run it before every
+push; CI runs the same, with the audit last.
 
 ## Workflow
 
@@ -91,9 +92,19 @@ same.
   - Grafana authentication or authorization settings, or anything published beyond
     `127.0.0.1`;
   - a new runtime dependency, or any major version update;
+  - a Dependabot PR in the `runtime` group (`@prometheus-io/client`, still 0.x);
   - the licence, the hard rules or this list.
 
   Such a PR's body opens with `Owner review: <item>`. Claude stops once CI is green and the review
   is done, tells the owner, and the owner reviews and merges.
+- **Dependabot.** `.github/dependabot.yml` opens monthly update PRs after a 7-day cooldown;
+  security updates come at once. Each PR gets the reviewer-agent pass, which reads the changelogs
+  between the two versions, and a green gate. Claude merges the `tooling` and `actions` groups; the
+  owner merges the `runtime` group and every major. Nothing auto-merges.
+- **Dependency audit.** A moderate or higher advisory turns the gate red. Fix it with an update
+  through a PR. Only when no fixed version fits and the vulnerable code is unreachable in
+  flop-watch may it be ignored, with the owner's approval and a written reason.
+- **After a merge.** GitHub deletes the remote branch. Switch to `main`, `git pull --ff-only`, and
+  delete the local branch with `git branch -D`.
 - **Commits.** Conventional Commits, imperative mood, no `Co-Authored-By` trailers.
 - **Docs.** Update `README.md`, `CLAUDE.md` and `docs/` in the same PR as any behaviour change.

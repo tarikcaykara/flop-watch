@@ -6,9 +6,10 @@ on:
     branches: [main]
 
 concurrency:
-  group: ci-${{ github.ref }}
-  # Superseded PR runs are cancelled; every push to main runs to completion.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # A pull request's new push cancels its superseded run. Every main push gets its own group, so no
+  # main run is cancelled, or replaced while pending, by the next merge.
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -34,3 +35,6 @@ jobs:
         run: pnpm typecheck
       - name: Test
         run: pnpm test
+      # Last, so a registry outage or a new advisory never hides code results.
+      - name: Dependency audit
+        run: pnpm audit:deps
