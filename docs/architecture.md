@@ -70,6 +70,7 @@ functions and closures. [Decision]
 | `src/parse.ts` | Pure, tolerant parsers for `/limits`, `/health`, `/chain` and `/stats` |
 | `src/metrics.ts` | Every metric definition in one place |
 | `src/log.ts` | JSON lines to stdout |
+| `src/clock.ts` | The injectable `schedule` timer type shared by the watcher and the probes |
 
 ## 4. Data collection strategy
 
@@ -158,7 +159,11 @@ In the PoC every interval was exactly 1 s, so the histogram mainly shows when sl
 - **Isolation.**
   - Each worker catches its own errors, so a failure never affects the other network.
   - Unhandled rejections are logged, never fatal.
-  - SIGTERM closes the sockets and stops the timers within 5 s.
+  - SIGTERM stops every worker, then the metrics server. Each WebSocket gets up to 5 s to finish
+    its close (the close deadline), and the process exits with 0 within 8 s. Docker's default stop
+    timeout is 10 s.
+- **Close deadline.** A peer that never answers the WebSocket close is abandoned after 5 s, so a
+  half-open connection can delay neither a reconnect nor a shutdown.
 
 ## 6. Prometheus metric design
 

@@ -119,15 +119,31 @@ describe("collector process", () => {
 		}
 	});
 
-	it("serves metrics, then exits with 0 within 5 s of SIGTERM", { timeout: 15_000 }, async () => {
+	it("runs a worker per network, serves metrics, then exits with 0 within 5 s of SIGTERM", {
+		timeout: 15_000,
+	}, async () => {
 		const port = await freePort();
+		const unreachable = await freePort(); // closed: the workers fail fast, nothing leaves the host
 		const { child, started: ready } = runCollector({
 			FLOPWATCH_HOST: "127.0.0.1",
 			FLOPWATCH_PORT: String(port),
+			FLOPWATCH_NETWORKS: "testnet",
+			FLOPWATCH_TESTNET_RPC_WS: `ws://127.0.0.1:${unreachable}`,
+			FLOPWATCH_TESTNET_RPC_HTTP: `http://127.0.0.1:${unreachable}`,
+			FLOPWATCH_TESTNET_FAUCET_URL: "",
+			FLOPWATCH_TESTNET_EXPLORER_API_URL: "",
 		});
 		try {
 			await ready;
 			assert.equal((await fetch(`http://127.0.0.1:${port}/healthz`)).status, 200);
+			const wsFailure =
+				'flopwatch_probe_total{network="testnet",target="rpc_ws",result="network_error"}';
+			let body = "";
+			const deadline = Date.now() + 5_000;
+			while (!body.includes(wsFailure) && Date.now() < deadline) {
+				body = await (await fetch(`http://127.0.0.1:${port}/metrics`)).text();
+			}
+			assert.ok(body.includes(wsFailure), "the testnet chain watcher is running");
 
 			const exited = once(child, "exit");
 			const started = Date.now();

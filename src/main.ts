@@ -1,13 +1,16 @@
-// Entry point: load the config, serve /metrics and /healthz, shut down cleanly on SIGTERM/SIGINT.
-// Network workers are started here from #7.
+// Entry point: load the config, start one isolated worker per network (chain watcher + HTTP RPC
+// probes), serve /metrics and /healthz, and shut down cleanly on SIGTERM/SIGINT.
 
 import { createServer, type Server } from "node:http";
+import { startChainWatcher } from "./chain-watcher.ts";
 import { type Config, loadConfig } from "./config.ts";
 import { createLogger, type Logger } from "./log.ts";
 import { createMetrics, type Metrics } from "./metrics.ts";
+import { startHttpRpcProbes } from "./probes.ts";
 import { VERSION } from "./version.ts";
 
-const SHUTDOWN_GRACE_MS = 5_000;
+/** Longer than the WebSocket close deadline (5 s), so a half-open peer cannot force exit code 1. */
+const SHUTDOWN_GRACE_MS = 8_000;
 
 /** Serves GET/HEAD /metrics and /healthz; other paths get 404, other methods 405. */
 export function startMetricsServer(options: {
@@ -66,6 +69,11 @@ async function main(): Promise<void> {
 		process.exitCode = 1;
 		return;
 	}
+	// Each worker handles its own failures, so one network can never stop the other.
+	const workers = config.networks.flatMap((network) => [
+		startChainWatcher({ network, metrics, log }),
+		startHttpRpcProbes({ network, metrics, log }),
+	]);
 	log.info("flop-watch started", {
 		version: VERSION,
 		host: config.host,
@@ -74,16 +82,17 @@ async function main(): Promise<void> {
 	});
 
 	let stopping = false;
-	const shutdown = (signal: NodeJS.Signals) => {
+	const shutdown = async (signal: NodeJS.Signals) => {
 		if (stopping) return;
 		stopping = true;
 		log.info("shutting down", { signal });
 		setTimeout(() => process.exit(1), SHUTDOWN_GRACE_MS).unref();
+		await Promise.all(workers.map((worker) => worker.stop()));
 		server.close(() => process.exit(0));
 		server.closeAllConnections();
 	};
-	process.once("SIGTERM", shutdown);
-	process.once("SIGINT", shutdown);
+	process.once("SIGTERM", (signal) => void shutdown(signal));
+	process.once("SIGINT", (signal) => void shutdown(signal));
 }
 
 if (import.meta.main) await main();

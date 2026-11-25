@@ -10,6 +10,7 @@ import {
 	parseBlockNumber,
 } from "./babe.ts";
 import { headerHash } from "./blake2b.ts";
+import { realSchedule, type Schedule } from "./clock.ts";
 import type { NetworkConfig } from "./config.ts";
 import type { Logger } from "./log.ts";
 import type { DisconnectReason, Metrics, ProbeResult } from "./metrics.ts";
@@ -54,13 +55,6 @@ interface Pending {
 	readonly cancelTimeout: () => void;
 }
 
-/** Runs `fn` after `ms` milliseconds and returns a function that cancels it. */
-export type Schedule = (ms: number, fn: () => void) => () => void;
-
-const realSchedule: Schedule = (ms, fn) => {
-	const timer = setTimeout(fn, ms);
-	return () => clearTimeout(timer);
-};
 const noop = () => {};
 
 export interface ChainWatcher {
