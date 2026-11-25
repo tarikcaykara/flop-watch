@@ -334,9 +334,9 @@ mirror. [Decision]
 
 - **Port.** **(PoC-driven)** The planned 9616 is already allocated to the Mailgun Exporter on the
   [Prometheus default port allocations](https://github.com/prometheus/prometheus/wiki/Default-port-allocations)
-  page. Port 9615 is the Substrate node's own metrics port. The proposal is 10063, the first
-  unallocated number after the current allocations on 2026-11-25. It is re-checked and registered
-  on the wiki at M1.
+  page. Port 9615 is the Substrate node's own metrics port. flop-watch uses 10063, the first
+  unallocated number after the allocations on 2026-11-25, and is registered there for it
+  (2026-11-25, #8).
 - **Values.** Every value is trimmed. An empty value means "use the default", except
   `_FAUCET_URL` and `_EXPLORER_API_URL`, where an empty value disables that probe. Keep `.env`
   free of non-collector keys under the `FLOPWATCH_` prefix.
