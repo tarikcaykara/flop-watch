@@ -322,10 +322,19 @@ mirror. [Decision]
   page. Port 9615 is the Substrate node's own metrics port. The proposal is 10063, the first
   unallocated number after the current allocations on 2026-11-25. It is re-checked and registered
   on the wiki at M1.
-- **Startup validation** fails fast on any of these:
-  - two networks sharing an expected genesis or an endpoint URL;
-  - malformed URLs;
-  - a genesis that is not 32-byte hex.
+- **Values.** Every value is trimmed. An empty value means "use the default", except
+  `_FAUCET_URL` and `_EXPLORER_API_URL`, where an empty value disables that probe. Keep `.env`
+  free of non-collector keys under the `FLOPWATCH_` prefix.
+- **Normalisation.** URLs are stored as origin + path without a trailing slash, so probes can
+  append paths. The genesis hash is lower-cased.
+- **Startup validation** fails fast, in one error that lists every problem, on any of these:
+  - an unknown, duplicated or empty network selection;
+  - a malformed URL, a scheme that does not fit the field (`ws`/`wss` for `_RPC_WS`, `http`/`https`
+    otherwise), or a URL with a query, a fragment or credentials;
+  - a genesis that is not 32-byte hex;
+  - two networks sharing an expected genesis, or an endpoint (host + path, whatever the scheme);
+  - a port outside 1–65535, or an unknown log level;
+  - an unknown `FLOPWATCH_*` variable, which catches typos.
 - **User-Agent.** Every request sends `User-Agent: flop-watch/<version> (+<repo URL>)`, so FLOP
   operators can identify and contact us.
 
