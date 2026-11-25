@@ -23,5 +23,8 @@
 		"@biomejs/biome": "^2.6.9",
 		"@types/node": "^24.19.4",
 		"typescript": "^7.0.2"
+	},
+	"dependencies": {
+		"@prometheus-io/client": "0.16.1"
 	}
 }

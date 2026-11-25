@@ -106,7 +106,7 @@ Milestones become GitHub milestones once the repo is public. One issue is one PR
 | Milestone | Content |
 |---|---|
 | M0 | Research: this phase (PoCs, research, architecture, MVP). |
-| M1 | Repo publication under Apache-2.0 (the licence of flop-labs/network, Prometheus and `prom-client`). Collector core: config, `rpc-http`, `chain-watcher`, `babe`, metrics server, tests. A minimal CI gate (`tsc --noEmit`, `biome ci`, `node --test`) lands with the scaffold, so every PR is checked from the start. |
+| M1 | Repo publication under Apache-2.0 (the licence of flop-labs/network, Prometheus and its JavaScript client). Collector core: config, `rpc-http`, `chain-watcher`, `babe`, metrics server, tests. A minimal CI gate (`tsc --noEmit`, `biome ci`, `node --test`) lands with the scaffold, so every PR is checked from the start. |
 | M2 | Service probes (faucet, explorer). Tolerant parsers with fixtures taken from `poc/results`. |
 | M3 | Stack: Dockerfile, Compose, Prometheus rules, Grafana provisioning and dashboard. CI extended with `promtool` and `docker build`; Dependabot. |
 | M4 | Public instance, README self-host guide, v0.1.0 release. |
