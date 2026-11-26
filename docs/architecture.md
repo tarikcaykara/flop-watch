@@ -373,6 +373,9 @@ annotation, because Grafana reads firing alerts from the `ALERTS` series, which 
 - **Values.** Every value is trimmed. An empty value means "use the default", except
   `_FAUCET_URL` and `_EXPLORER_API_URL`, where an empty value disables that probe. Keep `.env`
   free of non-collector keys under the `FLOPWATCH_` prefix.
+- **`.env.example`** lists every collector variable commented out at its default, so a copied
+  `.env` keeps following the code: a set value would pin, for example, an expected genesis that a
+  profile update changes. A unit test keeps the documented defaults equal to the code's.
 - **Normalisation.** URLs are stored as origin + path without a trailing slash, so probes can
   append paths. The genesis hash is lower-cased.
 - **Startup validation** fails fast, in one error that lists every problem, on any of these:
@@ -389,18 +392,30 @@ annotation, because Grafana reads firing alerts from the `ALERTS` series, which 
 ## 10. Deployment
 
 - **`compose.yaml`** has three services:
-  - `flop-watch`: the collector. It is not published; Prometheus scrapes it on the internal
-    network.
+  - `flop-watch`: the collector, built from the repository, and not published; Prometheus scrapes
+    it on the Compose network. It gets the whole `.env`, so the unknown-variable check (§9) still
+    catches a mistyped `FLOPWATCH_*` name; the cost is that `GRAFANA_ADMIN_PASSWORD` is in its
+    environment too, unused. The `.env` is optional only so the stack's checks can run with another
+    env file; a missing `.env` still stops `docker compose up` at the `GRAFANA_ADMIN_PASSWORD` check.
   - `prometheus`: `--storage.tsdb.retention.time=180d`, `--query.timeout=20s`,
-    `--query.max-samples=5000000`. It loads the rules file and is not published.
-  - `grafana`: published **only** on `127.0.0.1:3000`. Datasource and dashboard are provisioned
-    from files. The admin password comes from `.env`.
+    `--query.max-samples=5000000`. It reads `prometheus/prometheus.yml`, whose scrape job is named
+    `flop-watch` ([dashboard.md](dashboard.md) §7), and is not published. #13 adds the rules.
+  - `grafana`: published **only** on `127.0.0.1`, port `GRAFANA_PORT` (default 3000). The admin
+    password comes from `GRAFANA_ADMIN_PASSWORD` in `.env`, and only when the Grafana database is
+    first created. Usage reporting, update checks and plugin preinstalls are off; #14 sets the rest
+    of §11 and provisions the datasource and dashboard.
+  - Prometheus and Grafana images are pinned to exact versions; Prometheus and Grafana have
+    healthchecks, so `docker compose up --wait` returns once the stack is ready.
 - **Volumes.** Named volumes for Prometheus and Grafana data.
 - **Collector image.**
-  - Base `node:24-alpine`.
-  - `pnpm install --prod --frozen-lockfile`.
+  - Base `node:24-alpine`, pinned by digest; a build stage installs the production dependencies
+    with `pnpm install --prod --frozen-lockfile`, and the image holds only them, `package.json`
+    and `src/`.
   - Runs as the non-root `node` user with `CMD ["node", "src/main.ts"]`.
-  - `read_only: true` root filesystem; a healthcheck on `/healthz`.
+  - `read_only: true` root filesystem; a healthcheck on `/healthz` at `FLOPWATCH_PORT`.
+- **Stack e2e.** `pnpm test:e2e` (needs Docker) checks `compose.yaml` and runs the stack with
+  `test/e2e/compose.e2e.yaml`, which points the collector at a closed local port, so no FLOP host
+  is contacted. #38 adds a fake FLOP service and runs it in CI.
 - **Public instance.** The same Compose stack on the maintainer's server. Only Grafana is exposed,
   through the maintainer's reverse proxy or tunnel; that configuration lives outside this repo.
 - **Retention.** 180 days covers the roughly 90-day Testnet with headroom. At about 500 series and a

@@ -70,10 +70,12 @@ pnpm typecheck    # tsc --noEmit
 pnpm test         # node --test
 pnpm audit:deps   # pnpm audit --audit-level=moderate, from #24
 node src/main.ts  # collector, from #4
+pnpm test:e2e     # the Compose stack e2e; needs Docker, from #12
 ```
 
 The gate is `pnpm check && pnpm typecheck && pnpm test && pnpm audit:deps`. Run it before every
-push; CI runs the same, with the audit last.
+push; CI runs the same, with the audit last. Run `pnpm test:e2e` too before pushing a change to
+the Dockerfile, `compose.yaml`, `prometheus/` or `grafana/`; CI runs it from #38.
 
 ## Workflow
 
