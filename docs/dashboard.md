@@ -43,8 +43,8 @@ rows are collapsed, and Grafana runs no query for a collapsed row until a viewer
 - **Colours.** Green is healthy, orange is degraded or a warning threshold, red is down or a
   critical threshold. Blue and grey are neutral information, such as the per-client `ready` flag.
 - **Missing data.** A value series disappears when its source fails (architecture §5). Panels show
-  it as "No data" in grey, never as 0. Time series do not connect points across gaps longer than
-  2 min, so an outage stays visible as a gap.
+  it as "No data" in grey, never as 0. Time series and state timelines break at a missing sample
+  of the query step, at any time range, so an outage stays visible as a gap.
 - **Thresholds** use the numbers of the alerts in architecture §7, on the series each alert reads.
   The yellowpaper thresholds (30 and 120 blocks) are named as such in the description. A few
   panels add an earlier orange step that no alert uses, such as 10 s on the best head age; these
@@ -113,7 +113,7 @@ Grafana's grid is 24 columns wide; sizes are width × height in grid units.
 
 ### About
 
-- **A1 About** · text, 24×3
+- **A1 About** · text, 24×4
   - Content (Markdown): "Independent, read-only monitor of FLOP Network Devnet and Testnet,
     from a single vantage point. Not affiliated with FLOP Labs. **Measured**: observed by
     flop-watch. **Reported**: stated by a FLOP node or service. **Derived**: computed by a rule
@@ -178,13 +178,15 @@ Each stat shows the latest value of the selected network.
         3 * max by (alertname) (ALERTS{alertstate="firing", severity="critical", network=~"$network|"})
     or  2 * max by (alertname) (ALERTS{alertstate="firing", severity="warning", network=~"$network|"})
     or      max by (alertname) (ALERTS{alertstate="firing", severity="info", network=~"$network|"})
-    or on() label_replace(vector(0), "alertname", "No incident", "", "")
+    or on() label_replace(vector(0) and on() count(up{job="flop-watch"}), "alertname", "No incident", "", "")
     ```
 
   - Display: one row per alert, legend `{{alertname}}`; 3 "critical" red, 2 "warning" orange,
-    1 "info" blue. An empty stretch means the alert was not firing. While nothing fires, a green
-    "No incident" row shows instead; without it the empty result would render as "Data does not
-    have a time field". `network=~"$network|"` keeps `FlopWatchDown`, which has no network label.
+    1 "info" blue. An empty stretch means the alert was not firing. While nothing fires and
+    Prometheus has scrape data, a green "No incident" row shows instead; without it the empty result
+    would render as "Data does not have a time field", and without the `up` condition the row would
+    turn green for times with no data at all. `network=~"$network|"` keeps `FlopWatchDown`, which
+    has no network label.
   - Description: "Derived · Prometheus alert rules over flop-watch's signals. Each alert's
     category (measured, reported, derived) is in the Firing now table."
 - **I2 Firing now** · table, 12×6

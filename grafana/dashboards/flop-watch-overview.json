@@ -768,7 +768,7 @@
 						"type": "prometheus",
 						"uid": "prometheus"
 					},
-					"expr": "3 * max by (alertname) (ALERTS{alertstate=\"firing\", severity=\"critical\", network=~\"$network|\"})\nor 2 * max by (alertname) (ALERTS{alertstate=\"firing\", severity=\"warning\", network=~\"$network|\"})\nor max by (alertname) (ALERTS{alertstate=\"firing\", severity=\"info\", network=~\"$network|\"})\nor on() label_replace(vector(0), \"alertname\", \"No incident\", \"\", \"\")",
+					"expr": "3 * max by (alertname) (ALERTS{alertstate=\"firing\", severity=\"critical\", network=~\"$network|\"})\nor 2 * max by (alertname) (ALERTS{alertstate=\"firing\", severity=\"warning\", network=~\"$network|\"})\nor max by (alertname) (ALERTS{alertstate=\"firing\", severity=\"info\", network=~\"$network|\"})\nor on() label_replace(vector(0) and on() count(up{job=\"flop-watch\"}), \"alertname\", \"No incident\", \"\", \"\")",
 					"legendFormat": "{{alertname}}",
 					"instant": false,
 					"range": true
@@ -810,8 +810,7 @@
 					"custom": {
 						"fillOpacity": 80,
 						"lineWidth": 0,
-						"spanNulls": false,
-						"insertNulls": 120000
+						"spanNulls": false
 					}
 				},
 				"overrides": []
@@ -1080,8 +1079,7 @@
 					"custom": {
 						"fillOpacity": 80,
 						"lineWidth": 0,
-						"spanNulls": false,
-						"insertNulls": 120000
+						"spanNulls": false
 					}
 				},
 				"overrides": []
@@ -1163,7 +1161,6 @@
 						"fillOpacity": 0,
 						"showPoints": "never",
 						"spanNulls": false,
-						"insertNulls": 120000,
 						"stacking": {
 							"mode": "none",
 							"group": "A"
@@ -1239,7 +1236,6 @@
 						"fillOpacity": 80,
 						"showPoints": "never",
 						"spanNulls": false,
-						"insertNulls": 120000,
 						"stacking": {
 							"mode": "normal",
 							"group": "A"
@@ -1326,7 +1322,6 @@
 						"fillOpacity": 80,
 						"showPoints": "never",
 						"spanNulls": false,
-						"insertNulls": 120000,
 						"stacking": {
 							"mode": "normal",
 							"group": "A"
@@ -1412,7 +1407,6 @@
 						"fillOpacity": 0,
 						"showPoints": "never",
 						"spanNulls": false,
-						"insertNulls": 120000,
 						"stacking": {
 							"mode": "none",
 							"group": "A"
@@ -1634,7 +1628,6 @@
 						"fillOpacity": 0,
 						"showPoints": "never",
 						"spanNulls": false,
-						"insertNulls": 120000,
 						"stacking": {
 							"mode": "none",
 							"group": "A"
@@ -1719,7 +1712,6 @@
 						"fillOpacity": 0,
 						"showPoints": "never",
 						"spanNulls": false,
-						"insertNulls": 120000,
 						"stacking": {
 							"mode": "none",
 							"group": "A"
@@ -1931,7 +1923,6 @@
 						"fillOpacity": 80,
 						"showPoints": "never",
 						"spanNulls": false,
-						"insertNulls": 120000,
 						"stacking": {
 							"mode": "normal",
 							"group": "A"
@@ -2022,8 +2013,7 @@
 					"custom": {
 						"fillOpacity": 80,
 						"lineWidth": 0,
-						"spanNulls": false,
-						"insertNulls": 120000
+						"spanNulls": false
 					}
 				},
 				"overrides": []
@@ -2098,8 +2088,7 @@
 					"custom": {
 						"fillOpacity": 80,
 						"lineWidth": 0,
-						"spanNulls": false,
-						"insertNulls": 120000
+						"spanNulls": false
 					}
 				},
 				"overrides": []
@@ -2169,8 +2158,7 @@
 					"custom": {
 						"fillOpacity": 80,
 						"lineWidth": 0,
-						"spanNulls": false,
-						"insertNulls": 120000
+						"spanNulls": false
 					}
 				},
 				"overrides": [
@@ -2327,8 +2315,7 @@
 					"custom": {
 						"fillOpacity": 80,
 						"lineWidth": 0,
-						"spanNulls": false,
-						"insertNulls": 120000
+						"spanNulls": false
 					}
 				},
 				"overrides": []
@@ -2411,7 +2398,6 @@
 						"fillOpacity": 0,
 						"showPoints": "never",
 						"spanNulls": false,
-						"insertNulls": 120000,
 						"stacking": {
 							"mode": "none",
 							"group": "A"
@@ -2525,7 +2511,6 @@
 						"fillOpacity": 0,
 						"showPoints": "never",
 						"spanNulls": false,
-						"insertNulls": 120000,
 						"stacking": {
 							"mode": "none",
 							"group": "A"
@@ -2617,7 +2602,6 @@
 						"fillOpacity": 0,
 						"showPoints": "never",
 						"spanNulls": false,
-						"insertNulls": 120000,
 						"stacking": {
 							"mode": "none",
 							"group": "A"
@@ -2690,8 +2674,7 @@
 					"custom": {
 						"fillOpacity": 80,
 						"lineWidth": 0,
-						"spanNulls": false,
-						"insertNulls": 120000
+						"spanNulls": false
 					}
 				},
 				"overrides": [
@@ -2728,8 +2711,8 @@
 									{
 										"type": "range",
 										"options": {
-											"from": 100,
-											"to": 599,
+											"from": 0,
+											"to": 999,
 											"result": {
 												"color": "red",
 												"index": 2
@@ -2840,8 +2823,7 @@
 					"custom": {
 						"fillOpacity": 80,
 						"lineWidth": 0,
-						"spanNulls": false,
-						"insertNulls": 120000
+						"spanNulls": false
 					}
 				},
 				"overrides": []
@@ -2913,7 +2895,6 @@
 						"fillOpacity": 0,
 						"showPoints": "never",
 						"spanNulls": false,
-						"insertNulls": 120000,
 						"stacking": {
 							"mode": "none",
 							"group": "A"
@@ -2991,7 +2972,6 @@
 						"fillOpacity": 0,
 						"showPoints": "never",
 						"spanNulls": false,
-						"insertNulls": 120000,
 						"stacking": {
 							"mode": "none",
 							"group": "A"
@@ -3065,7 +3045,6 @@
 						"fillOpacity": 0,
 						"showPoints": "never",
 						"spanNulls": false,
-						"insertNulls": 120000,
 						"stacking": {
 							"mode": "none",
 							"group": "A"
@@ -3156,8 +3135,7 @@
 					"custom": {
 						"fillOpacity": 80,
 						"lineWidth": 0,
-						"spanNulls": false,
-						"insertNulls": 120000
+						"spanNulls": false
 					}
 				},
 				"overrides": []
@@ -3237,7 +3215,6 @@
 						"fillOpacity": 0,
 						"showPoints": "never",
 						"spanNulls": false,
-						"insertNulls": 120000,
 						"stacking": {
 							"mode": "none",
 							"group": "A"
@@ -3323,7 +3300,6 @@
 						"fillOpacity": 0,
 						"showPoints": "never",
 						"spanNulls": false,
-						"insertNulls": 120000,
 						"stacking": {
 							"mode": "none",
 							"group": "A"
@@ -3514,8 +3490,7 @@
 							"custom": {
 								"fillOpacity": 80,
 								"lineWidth": 0,
-								"spanNulls": false,
-								"insertNulls": 120000
+								"spanNulls": false
 							}
 						},
 						"overrides": []
@@ -3587,7 +3562,6 @@
 								"fillOpacity": 0,
 								"showPoints": "never",
 								"spanNulls": false,
-								"insertNulls": 120000,
 								"stacking": {
 									"mode": "none",
 									"group": "A"
@@ -3808,7 +3782,6 @@
 								"fillOpacity": 0,
 								"showPoints": "never",
 								"spanNulls": false,
-								"insertNulls": 120000,
 								"stacking": {
 									"mode": "none",
 									"group": "A"
@@ -3886,7 +3859,6 @@
 								"fillOpacity": 0,
 								"showPoints": "never",
 								"spanNulls": false,
-								"insertNulls": 120000,
 								"stacking": {
 									"mode": "none",
 									"group": "A"

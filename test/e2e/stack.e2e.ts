@@ -122,6 +122,7 @@ describe("compose.yaml", () => {
 			GF_SNAPSHOTS_EXTERNAL_ENABLED: "false",
 			GF_ANALYTICS_REPORTING_ENABLED: "false",
 			GF_ANALYTICS_CHECK_FOR_UPDATES: "false",
+			GF_METRICS_ENABLED: "false",
 			GF_DASHBOARDS_MIN_REFRESH_INTERVAL: "30s",
 		})) {
 			assert.equal(env[key], value, key);
@@ -306,5 +307,36 @@ describe("the stack", { timeout: 600_000 }, () => {
 			await (await grafana("/api/frontend/settings")).text(),
 		);
 		assert.equal(settings.minRefreshInterval, "30s");
+	});
+
+	it("keeps the §11 hardening at runtime: nothing to sign up, edit, write or scrape", async () => {
+		const settings: {
+			buildInfo?: { version?: string };
+			disableUserSignUp?: boolean;
+			viewersCanEdit?: boolean;
+			newsFeedEnabled?: boolean;
+		} = JSON.parse(await (await grafana("/api/frontend/settings")).text());
+		assert.equal(settings.buildInfo?.version, "", "version hidden from anonymous visitors");
+		assert.equal(settings.disableUserSignUp, true);
+		assert.equal(settings.viewersCanEdit, false);
+		assert.equal(settings.newsFeedEnabled, false);
+
+		const post = (path: string, body: unknown) =>
+			grafana(path, {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify(body),
+			});
+		for (const [path, body] of [
+			["/api/snapshots", { dashboard: { title: "x" } }],
+			["/api/playlists", { name: "x", interval: "5m", items: [] }],
+			["/api/annotations", { text: "x" }],
+			["/api/folders", { title: "x" }],
+			["/api/library-elements", { name: "x", kind: 1, model: {} }],
+		] as const) {
+			const response = await post(path, body);
+			assert.ok([401, 403].includes(response.status), `${path} answered ${response.status}`);
+		}
+		assert.equal((await grafana("/metrics")).status, 404, "Grafana's own metrics are off");
 	});
 });

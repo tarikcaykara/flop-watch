@@ -182,6 +182,7 @@ describe("flop-watch-overview dashboard (docs/dashboard.md)", () => {
 	});
 
 	it("fills every grid line of every row exactly, with no overlap", () => {
+		assert.ok(allPanels.length > 0, "the dashboard has panels");
 		for (const row of rows(dashboard.panels ?? [])) {
 			const lines = new Map<number, Panel[]>();
 			for (const panel of row.panels) {
@@ -199,6 +200,7 @@ describe("flop-watch-overview dashboard (docs/dashboard.md)", () => {
 	});
 
 	it("starts every panel description with its category and source", () => {
+		assert.ok(allPanels.length > 0, "the dashboard has panels");
 		for (const panel of allPanels) {
 			if (panel.type === "text") continue;
 			assert.match(
@@ -223,6 +225,7 @@ describe("flop-watch-overview dashboard (docs/dashboard.md)", () => {
 		known.add("ALERTS");
 		known.add("process_resident_memory_bytes");
 
+		assert.ok(allPanels.length > 0, "the dashboard has panels");
 		for (const panel of allPanels) {
 			for (const { expr } of panel.targets ?? []) {
 				for (const [name] of expr.matchAll(/\b(flopwatch[:_][a-z0-9_:]+|ALERTS|process_\w+)/g)) {
@@ -232,11 +235,16 @@ describe("flop-watch-overview dashboard (docs/dashboard.md)", () => {
 		}
 	});
 
-	it("selects the chosen network in every query, except the collector's own", () => {
+	it("selects the chosen network in every series selector, except the collector's own", () => {
+		assert.ok(allPanels.length > 0, "the dashboard has panels");
 		for (const panel of allPanels) {
 			for (const { expr } of panel.targets ?? []) {
-				if (/flopwatch_build_info|process_resident_memory_bytes/.test(expr)) continue;
-				assert.match(expr, /network=~?"\$network\|?"/, `${panel.title}: ${expr}`);
+				for (const [selector, name] of expr.matchAll(
+					/\b(flopwatch[:_][a-z0-9_:]+|ALERTS)(\{[^}]*\})?/g,
+				)) {
+					if (name === "flopwatch_build_info") continue;
+					assert.match(selector, /\{[^}]*network=~?"\$network\|?"/, `${panel.title}: ${selector}`);
+				}
 			}
 		}
 	});

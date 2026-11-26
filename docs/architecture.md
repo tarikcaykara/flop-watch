@@ -414,7 +414,8 @@ rules and evaluates them without errors.
     first created. §11 lists its other settings.
   - Prometheus and Grafana images are pinned to exact versions; Prometheus and Grafana have
     healthchecks, so `docker compose up --wait` returns once the stack is ready.
-- **Volumes.** Named volumes for Prometheus and Grafana data.
+- **Volumes.** Named volumes for Prometheus and Grafana data; `prometheus/` and the Grafana
+  provisioning and dashboard folders are bind-mounted read-only from the repository.
 - **Collector image.**
   - Base `node:24-alpine`, pinned by digest; a build stage installs the production dependencies
     with `pnpm install --prod --frozen-lockfile`, and the image holds only them, `package.json`
@@ -451,10 +452,17 @@ rules and evaluates them without errors.
   - External snapshots off: `GF_SNAPSHOTS_EXTERNAL_ENABLED=false`.
   - A 30 s minimum refresh: `GF_DASHBOARDS_MIN_REFRESH_INTERVAL=30s`.
   - Nothing sent to grafana.com or gravatar.com: usage reporting, update checks, plugin
-    preinstalls, the news feed and Gravatar are off.
-- **Residual risk.** Anonymous viewers can send arbitrary PromQL through Grafana's datasource query
-  API. This is accepted: all the data is public, and the Prometheus query limits (§10) bound the
-  cost.
+    preinstalls, the news feed and Gravatar are off. Grafana's own `/metrics` is off too
+    (`GF_METRICS_ENABLED=false`).
+  - The e2e checks at runtime: the hidden version, sign-up and viewer edits off, and anonymous
+    writes to snapshots, playlists, annotations, folders and library panels refused.
+- **Residual risk.**
+  - Anonymous viewers can send arbitrary PromQL through Grafana's datasource query API. This is
+    accepted: all the data is public, and the Prometheus query limits (§10) bound the cost.
+  - Anonymous viewers can create short URLs (`POST /api/short-urls`), which writes a row to
+    Grafana's database. No setting turns this off; the public instance (M4) blocks the path at its
+    reverse proxy or accepts the risk.
+  - Public dashboards exist in Grafana 13, but only an admin can create one.
 - **Supply chain.** One runtime dependency, a committed lockfile, images pinned to exact versions,
   and Dependabot or manual updates.
 - **No personal data.** Metrics and logs contain no addresses. The faucet signer address in the
@@ -475,5 +483,5 @@ rules and evaluates them without errors.
 | Alertmanager or notifications | User decision: incidents are derived and shown only |
 | Zod | Only about 20 fields are read; hand-written tolerant parsers with fixtures suffice |
 | `prom-client` | Deprecated on npm in favour of `@prometheus-io/client`, the same code base under the Prometheus organisation (owner-approved switch, #4) |
-| Grafana externally shared dashboards | Not file-provisionable; unverified for the pinned version, so confirm at M3 |
+| Grafana externally shared dashboards | Not file-provisionable, and a link to the anonymous dashboard does the same job; in Grafana 13 only an admin can create one (§11) |
 | Per-validator authority metrics | Validator seats will grow toward 1,000, which means high cardinality; YAGNI |

@@ -21,8 +21,6 @@ const GREY = "#8e8e8e";
 const NONE = "transparent";
 
 const BLOCKS = "suffix: blocks";
-/** Gaps longer than this stay open in time series (§3), in milliseconds. */
-const MAX_GAP_MS = 120_000;
 
 /** A selector of the chosen network, with optional extra matchers. */
 const sel = (metric: string, extra = "") =>
@@ -44,12 +42,13 @@ const SPONSOR_CODE = ["open", "automatic_full", "positions_full", "unknown", "ot
 const firing = (severity: string) =>
 	`max by (alertname) (ALERTS{alertstate="firing", severity="${severity}", network=~"$network|"})`;
 // With nothing firing, a "No incident" row keeps the timeline from rendering an empty frame,
-// which Grafana reports as "Data does not have a time field".
+// which Grafana reports as "Data does not have a time field". The row needs flop-watch's scrape
+// series, so a time with no data at all stays empty instead of green.
 const INCIDENTS = [
 	`3 * ${firing("critical")}`,
 	`2 * ${firing("warning")}`,
 	firing("info"),
-	'on() label_replace(vector(0), "alertname", "No incident", "", "")',
+	'on() label_replace(vector(0) and on() count(up{job="flop-watch"}), "alertname", "No incident", "", "")',
 ].join("\nor ");
 
 /** Value mappings: each value shows as its text, in its colour. */
@@ -78,7 +77,7 @@ const SPONSOR_STATUS = [
 const HTTP_STATUS: Json[] = [
 	values([503, "503 degraded", ORANGE]),
 	{ type: "range", options: { from: 200, to: 299, result: { color: GREEN, index: 1 } } },
-	{ type: "range", options: { from: 100, to: 599, result: { color: RED, index: 2 } } },
+	{ type: "range", options: { from: 0, to: 999, result: { color: RED, index: 2 } } },
 ];
 
 /** Threshold steps: a base colour, then `[from, colour]` pairs. */
@@ -120,13 +119,12 @@ interface Common {
 	readonly h: number;
 	readonly queries: readonly Query[];
 }
-/** A field override that applies `properties` to the series named `name`. */
-function byName(name: string, properties: Obj): Json {
-	return {
-		matcher: { id: "byName", options: name },
-		properties: Object.entries(properties).map(([id, value]) => ({ id, value })),
-	};
+/** A field override that applies `properties` to the series `matcher` selects. */
+function override(matcher: Obj, properties: Obj): Json {
+	return { matcher, properties: Object.entries(properties).map(([id, value]) => ({ id, value })) };
 }
+const byName = (name: string, properties: Obj) =>
+	override({ id: "byName", options: name }, properties);
 
 function stat(
 	o: Common & {
@@ -161,7 +159,7 @@ function stat(
 			},
 			options: {
 				reduceOptions: { calcs: ["lastNotNull"], fields: "", values: false },
-				colorMode: o.colorMode ?? (o.textMode === "name" ? "none" : "background"),
+				colorMode: o.colorMode ?? "background",
 				graphMode: "none",
 				textMode: o.textMode ?? "value",
 				justifyMode: "center",
@@ -189,7 +187,9 @@ function timeline(o: Common & { mappings: Json[]; overrides?: Json[] }): Spec {
 					// Not "thresholds": with merged values, Grafana then shows threshold ranges and skips
 					// the value mappings. Unmapped values stay grey.
 					color: { mode: "fixed", fixedColor: GREY },
-					custom: { fillOpacity: 80, lineWidth: 0, spanNulls: false, insertNulls: MAX_GAP_MS },
+					// No insertNulls: Grafana then breaks a line at a missing sample of the query step, at
+					// any time range; a fixed threshold would break every line once the step is longer.
+					custom: { fillOpacity: 80, lineWidth: 0, spanNulls: false },
 				},
 				overrides: o.overrides ?? [],
 			},
@@ -241,7 +241,6 @@ function series(
 						fillOpacity: bars ? 80 : 0,
 						showPoints: "never",
 						spanNulls: false,
-						insertNulls: MAX_GAP_MS,
 						stacking: { mode: bars ? "normal" : "none", group: "A" },
 						thresholdsStyle: { mode: o.thresholds === undefined ? "off" : "line" },
 						...(o.axisLabel === undefined ? {} : { axisLabel: o.axisLabel }),
@@ -548,12 +547,7 @@ const rpc: Spec[][] = [
 				{ expr: sel("flopwatch_rpc_node_is_syncing"), legend: "syncing ({{transport}})" },
 			],
 			decimals: 0,
-			overrides: [
-				{
-					matcher: { id: "byRegexp", options: "^syncing" },
-					properties: Object.entries(flagBars).map(([id, value]) => ({ id, value })),
-				},
-			],
+			overrides: [override({ id: "byRegexp", options: "^syncing" }, flagBars)],
 		}),
 	],
 ];
@@ -949,6 +943,7 @@ const collector: Spec[][] = [
 			h: 4,
 			queries: [{ expr: "flopwatch_build_info", instant: true }],
 			textMode: "name",
+			colorMode: "none",
 			// biome-ignore lint/suspicious/noTemplateCurlyInString: a Grafana field template, not JS.
 			displayName: "${__field.labels.version}",
 		}),
