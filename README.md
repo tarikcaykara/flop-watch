@@ -25,6 +25,7 @@ flop-watch is a community project. It is not affiliated with or endorsed by FLOP
 
 - [Research](docs/research.md): verified endpoints, PoC results, existing tools and limitations.
 - [Architecture](docs/architecture.md): collector, metrics, rules, dashboard and deployment design.
+- [Dashboard](docs/dashboard.md): the Grafana panel spec, with each panel's question and query.
 - [MVP](docs/mvp.md): scope, acceptance criteria, roadmap and go/no-go.
 
 ## Running the collector

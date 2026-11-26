@@ -144,6 +144,5 @@ eligible for an airdrop, and it earns no vouchers.
 
 - Gateway and MCP `/health`, and keyless model counts (first post-MVP candidate).
 - Per-authority block production, as a bounded top-N to keep cardinality fixed.
-- Grafana annotations for runtime upgrades.
 - A probe from a second vantage point.
 - An account inspector, if participants need one more than they need the explorer.
