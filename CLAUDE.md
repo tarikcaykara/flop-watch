@@ -13,6 +13,8 @@ code, comments, docs, commits, issues and PRs.
 - `docs/architecture.md`: read it before any change to collection, metrics, rules, dashboards or
   deployment. When a decision changes, update it in the same PR.
 - `docs/research.md`: the verified facts about FLOP endpoints, with their evidence tags.
+- `docs/dashboard.md`: the panel spec of the Grafana dashboard. Read it before changing rules or the
+  dashboard; a panel change updates it in the same PR.
 - `docs/mvp.md`: what is in and out of scope, the acceptance criteria and the roadmap.
 - `poc/`: the frozen research probes and their recorded results. These are the reference fixtures
   for parsers and decoders. Do not edit them; copy what you need into `test/fixtures/`.

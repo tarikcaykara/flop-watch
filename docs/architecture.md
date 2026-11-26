@@ -235,8 +235,8 @@ Notes:
 
 ## 7. Derived signals
 
-File: `prometheus/rules/flop-watch.rules.yml`. Everything derived lives **only** in rules. These
-are inferences, and each alert's `category` annotation says so.
+File: `prometheus/rules/flop-watch.rules.yml`. Everything derived lives **only** in rules. Each
+alert's `category` label says whether the signal it reads is measured, reported or derived.
 
 **Recording rules:**
 
@@ -283,7 +283,9 @@ deliberately left out of the rule. They compare against constants in the UI's ow
 mismatch there means a UI/backend release skew, not an outage, and it would need extra metrics to
 mirror. [Decision]
 
-**Alerts.** Each has a `severity` label and a `category` annotation:
+**Alerts.** Each has a `severity` and a `category` label. `category` is a label, not an
+annotation, because Grafana reads firing alerts from the `ALERTS` series, which carries labels only
+([dashboard.md](dashboard.md) §7):
 
 | Alert | Condition | `for` | Severity | Category |
 |---|---|---|---|---|
@@ -298,7 +300,8 @@ mirror. [Decision]
 | `FlopFaucetClaimsNotReady` | `flopwatch:faucet_claim_ready == 0` | 5m | warning | derived |
 | `FlopFaucetLowBalance` | `flopwatch_faucet_status{status="low_balance"} == 1` | 5m | warning | reported |
 | `FlopFaucetLimitsStale` | `flopwatch:faucet_limits_age_seconds > 300` | 5m | warning | derived |
-| `FlopExplorerIndexerLagging` | `flopwatch:explorer_indexer_lag_blocks > 120` **or** `flopwatch_probe_success{target="explorer_stats"} == 0` | 5m | warning | derived |
+| `FlopExplorerDown` | `flopwatch_probe_success{target="explorer_stats"} == 0` | 5m | warning | measured |
+| `FlopExplorerIndexerLagging` | `flopwatch:explorer_indexer_lag_blocks > 120` | 5m | warning | derived |
 | `FlopWatchDown` | `up{job="flop-watch"} == 0` | 2m | critical | measured |
 
 **Thresholds.**
@@ -314,19 +317,27 @@ mirror. [Decision]
 
 - **Provisioning.** A Prometheus datasource and one dashboard, `flop-watch-overview`, both
   provisioned from files.
+- **Panel spec.** [dashboard.md](dashboard.md) specifies every panel: its question, query,
+  display, category and description text, plus the dashboard settings.
 - **Network variable.** The `network` variable is single-select, with `testnet` as the default.
   Networks are never mixed in a panel.
-- **Rows:**
-  1. **Identity:** chain, spec name/version, genesis match per source, runtime-upgrade annotations.
-  2. **RPC:** WS and HTTP up; p50/p95 latency from the histogram; peers; WS connects and
-     disconnects by reason.
-  3. **Blocks:** best and finalized number, finality lag, block interval (heatmap), best and
-     finalized head age, skipped and rewound notifications.
-  4. **Faucet:** claim readiness (derived, with the UI-mirror explanation); status timeline;
-     balance vs. minimum; daily cap; pending grants; `/limits` latency and `asOf` age; sponsor
-     lanes; `/health` dependencies.
-  5. **Explorer:** indexer lag; probe state.
-  6. **Incidents:** state timeline of `ALERTS{alertstate="firing", network="$network"}`.
+- **Rows**, in this order:
+  1. **Now:** one stat per question a participant asks first: RPC WS and HTTP up, best head age,
+     finality lag, faucet claim readiness and status, explorer up, genesis match.
+  2. **Incidents:** state timeline of the firing alerts, the alerts firing now, and each probe's
+     last success.
+  3. **RPC:** availability; p50/p95 latency from the histogram; failures by result; WS connects
+     and disconnects by reason; peers and syncing.
+  4. **Blocks and finality:** best and finalized number, finality lag, best and finalized head
+     age, block interval (heatmap), skipped and rewound notifications.
+  5. **Faucet:** claim readiness (derived, with the UI-mirror explanation); probe states; status
+     and sponsor lane timelines; balance vs. minimum; daily cap; pending grants; `/health` status
+     and dependencies; indexer lag; `/limits` `asOf` age and latency.
+  6. **Explorer:** probe state; indexer lag; the explorer's own finality view.
+  7. **Identity** (collapsed): chain, spec name/version, slot duration, genesis match per source.
+     Runtime upgrades are annotations on every time-series panel.
+  8. **Collector** (collapsed): version, request rate against the budget, memory, schema
+     mismatches.
 - **Panel descriptions** state whether the data is **measured**, **reported** or **derived**, and
   name the source call.
 
