@@ -20,7 +20,7 @@ import { PROFILES } from "../src/config.ts";
 import { REQUEST_TIMEOUT_MS } from "../src/http.ts";
 import { createLogger } from "../src/log.ts";
 import { createMetrics, type Metrics } from "../src/metrics.ts";
-import { eventually, type ManualClock, manualClock, sample } from "./helpers.ts";
+import { eventually, type ManualClock, manualClock, sample, zeroSeries } from "./helpers.ts";
 
 interface Fixtures {
 	networks: Record<string, { babeConfiguration: string; headers: Array<{ header: RpcHeader }> }>;
@@ -326,7 +326,7 @@ describe("chain watcher", () => {
 			8,
 		);
 		assert.equal(await sample(metrics.probeSuccess, { target: "rpc_ws" }), 0);
-		assert.equal(await sample(metrics.wsConnects, net), undefined);
+		assert.equal(await sample(metrics.wsConnects, net), 0);
 	});
 
 	it("resets the backoff after 5 min of a stable connection", async () => {
@@ -367,7 +367,7 @@ describe("chain watcher", () => {
 		await subscribedOn(node, 1);
 		node.freeze();
 		clock.advance(WATCHDOG_MS);
-		assert.equal(await sample(metrics.wsDisconnects, { reason: "stall_timeout" }), undefined);
+		assert.equal(await sample(metrics.wsDisconnects, { reason: "stall_timeout" }), 0);
 
 		clock.advance(CLOSE_DEADLINE_MS);
 		assert.equal(await sample(metrics.wsDisconnects, { reason: "stall_timeout" }), 1);
@@ -397,13 +397,48 @@ describe("chain watcher", () => {
 			async () => (await sample(metrics.probeTotal, { target: "rpc_ws", result: "timeout" })) === 1,
 			"connect timeout",
 		);
-		assert.equal(await sample(metrics.wsConnects, net), undefined);
+		assert.equal(await sample(metrics.wsConnects, net), 0);
 		clock.advance(CLOSE_DEADLINE_MS);
 		assert.equal(
 			logs.some((l) => l["msg"] === "ws close not acknowledged, abandoning the socket"),
 			false,
 			"the deadline of an already ended session is cancelled",
 		);
+	});
+
+	it("creates its counters and histograms at 0 before the first connection completes", async () => {
+		const server = await silentTcpServer();
+		cleanups.push(() => server.close());
+		watch(server.url);
+		assert.equal(await sample(metrics.wsConnects, net), 0);
+		assert.deepEqual(await zeroSeries(metrics.wsDisconnects, net, "reason"), [
+			"close",
+			"error",
+			"stall_timeout",
+		]);
+		assert.equal(await sample(metrics.headSkippedBlocks, net), 0);
+		assert.equal(await sample(metrics.headRewinds, net), 0);
+		const intervals = "flopwatch_chain_block_interval_seconds_count";
+		assert.equal(await sample(metrics.blockInterval, net, intervals), 0);
+		const durations = "flopwatch_probe_duration_seconds_count";
+		assert.equal(await sample(metrics.probeDuration, { target: "rpc_ws" }, durations), 0);
+		assert.deepEqual(await zeroSeries(metrics.probeTotal, { target: "rpc_ws" }, "result"), [
+			"invalid_response",
+			"network_error",
+			"ok",
+			"rpc_error",
+			"timeout",
+		]);
+		assert.deepEqual(await zeroSeries(metrics.schemaMismatch, { target: "rpc_ws" }, "field"), [
+			"babe_configuration",
+			"chain",
+			"genesis",
+			"header",
+			"health",
+			"message",
+			"runtime_version",
+			"subscription",
+		]);
 	});
 
 	it("stop() during the handshake resolves at once, and twice is harmless", async () => {

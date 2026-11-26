@@ -362,3 +362,19 @@ export function createMetrics(options: { defaultMetrics?: boolean } = {}): Metri
 	if (options.defaultMetrics ?? true) collectDefaultMetrics({ register: registry });
 	return metrics;
 }
+
+/**
+ * Creates a probe target's counters and duration histogram at 0 (dashboard.md §3): `increase()`
+ * cannot see a counter's first event when its series first appears at 1. `results` and `fields`
+ * are what the target can report.
+ */
+export function zeroTargetSeries(
+	metrics: Metrics,
+	labels: { readonly network: string; readonly target: Target },
+	results: readonly ProbeResult[],
+	fields: readonly string[],
+): void {
+	for (const result of results) metrics.probeTotal.inc({ ...labels, result }, 0);
+	for (const field of fields) metrics.schemaMismatch.inc({ ...labels, field }, 0);
+	metrics.probeDuration.zero(labels);
+}

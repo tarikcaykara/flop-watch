@@ -230,8 +230,14 @@ Notes:
   the collector's own address", not global readiness. **(PoC-driven)**
 - **FLOP amounts** are decimal strings in whole FLOP. They are parsed with `Number()` and fit the
   float64 range observed (≤ 1.2 × 10⁸).
-- **Series count.** The expected count is about 400–500 for two networks: about 190 per network,
-  plus process metrics. The limit is < 1,000. Check it with `count({__name__=~"flopwatch_.*"})`.
+- **Counters start at 0.** Each worker creates its bounded counter series at 0 when it starts:
+  each target's possible `result` values and schema-mismatch `field` values, the WebSocket
+  connects, disconnect reasons, skipped blocks and rewinds, and the probe-duration and
+  block-interval histograms. `increase()` would otherwise miss a counter's first event
+  ([dashboard.md](dashboard.md) §3).
+- **Series count.** Measured on 2026-11-26 with both networks and every probe running: 428
+  `flopwatch_*` series (about 214 per network), 614 with the process metrics. The limit is
+  < 1,000. Check it with `count({__name__=~"flopwatch_.*"})`.
 
 ## 7. Derived signals
 

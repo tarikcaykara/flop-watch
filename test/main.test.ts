@@ -138,8 +138,11 @@ describe("collector process", () => {
 			await ready;
 			assert.equal((await fetch(`http://127.0.0.1:${port}/healthz`)).status, 200);
 			const series = (target: string) =>
-				`flopwatch_probe_total{network="testnet",target="${target}",result="network_error"}`;
+				`flopwatch_probe_total{network="testnet",target="${target}",result="network_error"} `;
 			const scrape = async () => (await fetch(`http://127.0.0.1:${port}/metrics`)).text();
+			/** True once the series has counted a request: it exists at 0 from the start. */
+			const counted = (body: string, target: string) =>
+				body.split("\n").some((line) => line.startsWith(series(target)) && !line.endsWith(" 0"));
 			// The HTTP probes start after up to 5 s of jitter; a closed port fails at once.
 			await eventually(
 				async () => {
@@ -151,7 +154,7 @@ describe("collector process", () => {
 						"faucet_health",
 						"faucet_chain",
 						"explorer_stats",
-					].every((target) => body.includes(series(target)));
+					].every((target) => counted(body, target));
 				},
 				"every worker running",
 				8_000,
@@ -163,6 +166,35 @@ describe("collector process", () => {
 			const [code] = await exited;
 			assert.equal(code, 0);
 			assert.ok(Date.now() - started < 5_000);
+		} finally {
+			child.kill("SIGKILL");
+		}
+	});
+
+	it("serves the counters at 0 before any probe runs, and none for disabled probes", {
+		timeout: 20_000,
+	}, async () => {
+		const port = await freePort();
+		const unreachable = await freePort();
+		const { child, started: ready } = runCollector({
+			FLOPWATCH_HOST: "127.0.0.1",
+			FLOPWATCH_PORT: String(port),
+			FLOPWATCH_NETWORKS: "testnet",
+			FLOPWATCH_TESTNET_RPC_WS: `ws://127.0.0.1:${unreachable}`,
+			FLOPWATCH_TESTNET_RPC_HTTP: `http://127.0.0.1:${unreachable}`,
+			FLOPWATCH_TESTNET_FAUCET_URL: "",
+			FLOPWATCH_TESTNET_EXPLORER_API_URL: "",
+		});
+		try {
+			await ready;
+			const body = await (await fetch(`http://127.0.0.1:${port}/metrics`)).text();
+			// A request can only fail against the closed port, so `ok` stays 0 whenever we scrape.
+			assert.match(
+				body,
+				/^flopwatch_probe_total\{network="testnet",target="rpc_http",result="ok"\} 0$/m,
+			);
+			assert.match(body, /^flopwatch_ws_disconnects_total\{network="testnet",reason="error"\} 0$/m);
+			assert.doesNotMatch(body, /target="(faucet_\w+|explorer_stats)"/);
 		} finally {
 			child.kill("SIGKILL");
 		}

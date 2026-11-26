@@ -12,19 +12,25 @@ import {
 	FAUCET_DEPENDENCIES,
 	FAUCET_STATUSES,
 	type Metrics,
+	PROBE_RESULTS,
 	type ProbeResult,
 	SPONSOR_LANES,
 	SPONSOR_STATUSES,
 	type Target,
+	zeroTargetSeries,
 } from "./metrics.ts";
 import {
+	CHAIN_FIELDS,
 	type ChainField,
+	HEALTH_FIELDS,
 	type HealthField,
+	LIMITS_FIELDS,
 	type LimitsField,
 	parseExplorerStats,
 	parseFaucetChain,
 	parseFaucetHealth,
 	parseFaucetLimits,
+	STATS_FIELDS,
 	type StatsField,
 } from "./parse.ts";
 import { rpcCall } from "./rpc-http.ts";
@@ -117,7 +123,11 @@ const retryAfter = (outcome: HttpOutcome) =>
 	outcome.result === "ok" ? null : outcome.retryAfterMs;
 
 /** Remote fields the HTTP RPC probes can report in flopwatch_schema_mismatch_total. */
-type RpcHttpField = "header" | "health" | "genesis";
+const RPC_HTTP_FIELDS = ["header", "health", "genesis"] as const;
+type RpcHttpField = (typeof RPC_HTTP_FIELDS)[number];
+
+/** Every result a GET probe can report: all but rpc_error, which belongs to JSON-RPC. */
+const GET_RESULTS = PROBE_RESULTS.filter((result) => result !== "rpc_error");
 
 /**
  * The HTTP JSON-RPC probes of one network: `chain_getHeader` + `system_health` every 30 s
@@ -133,6 +143,7 @@ export function startHttpRpcProbes(
 	const target = { network: network.name, target: "rpc_http" } as const;
 	const httpTransport = { network: network.name, transport: "http" } as const;
 	let stopped = false;
+	zeroTargetSeries(metrics, target, PROBE_RESULTS, RPC_HTTP_FIELDS);
 
 	/** Records one request; `valid` is false when an ok answer had the wrong shape. */
 	const record = (
@@ -304,6 +315,9 @@ export function startFaucetProbes(
 	const paced = sharedPause(options.now ?? (() => performance.now()));
 	const { byNetwork, record, put } = getProbeWriter(options);
 	let stopped = false;
+	zeroTargetSeries(metrics, { ...byNetwork, target: "faucet_limits" }, GET_RESULTS, LIMITS_FIELDS);
+	zeroTargetSeries(metrics, { ...byNetwork, target: "faucet_health" }, GET_RESULTS, HEALTH_FIELDS);
+	zeroTargetSeries(metrics, { ...byNetwork, target: "faucet_chain" }, GET_RESULTS, CHAIN_FIELDS);
 
 	const limits = async (): Promise<number | null> => {
 		const outcome = await getJson(`${faucetUrl}/limits`);
@@ -406,8 +420,9 @@ export function startExplorerProbe(
 	options: { network: NetworkConfig; explorerApiUrl: string; metrics: Metrics } & LoopOptions,
 ): ProbeLoop {
 	const { network, explorerApiUrl, metrics } = options;
-	const { record, put } = getProbeWriter(options);
+	const { byNetwork, record, put } = getProbeWriter(options);
 	let stopped = false;
+	zeroTargetSeries(metrics, { ...byNetwork, target: "explorer_stats" }, GET_RESULTS, STATS_FIELDS);
 
 	const stats = async (): Promise<number | null> => {
 		const outcome = await getJson(`${explorerApiUrl}/stats`);

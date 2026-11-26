@@ -7,6 +7,7 @@ import type { RpcHeader } from "../src/babe.ts";
 import { PROFILES } from "../src/config.ts";
 import { createLogger } from "../src/log.ts";
 import { createMetrics, type Metrics } from "../src/metrics.ts";
+import { CHAIN_FIELDS, HEALTH_FIELDS, LIMITS_FIELDS, STATS_FIELDS } from "../src/parse.ts";
 import {
 	EXPLORER_INTERVAL_MS,
 	FAUCET_INTERVAL_MS,
@@ -23,10 +24,12 @@ import {
 	eventually,
 	type ManualClock,
 	manualClock,
+	nonZero,
 	REMOVE,
 	sample,
 	serviceBody,
 	withField,
+	zeroSeries,
 } from "./helpers.ts";
 
 const silent = createLogger("error", () => {});
@@ -482,7 +485,7 @@ describe("faucet and explorer probes", () => {
 		assert.equal(await sample(metrics.faucetIndexerLag), 2);
 
 		assert.equal(await sample(metrics.genesisMatch, { source: "faucet" }), 1);
-		assert.deepEqual((await metrics.schemaMismatch.get()).values, []);
+		assert.deepEqual(await nonZero(metrics.schemaMismatch), []);
 
 		clock.advance(FAUCET_INTERVAL_MS - 1);
 		await settle();
@@ -524,7 +527,7 @@ describe("faucet and explorer probes", () => {
 			assert.equal(await sample(metrics.faucetSponsorStatus, { lane, status: "open" }), 0);
 		}
 		assert.equal(await sample(metrics.faucetBalance), 30482522);
-		assert.deepEqual((await metrics.schemaMismatch.get()).values, []);
+		assert.deepEqual(await nonZero(metrics.schemaMismatch), []);
 	});
 
 	it("takes a 503 /health with Retry-After: 60 as a valid answer that pauses nothing", async () => {
@@ -560,7 +563,7 @@ describe("faucet and explorer probes", () => {
 		assert.equal(await sample(metrics.probeSuccess, { target: "faucet_chain" }), 0);
 		assert.equal(await sample(metrics.probeSuccess, { target: "faucet_limits" }), 1);
 		assert.equal(await sample(metrics.genesisMatch, { source: "faucet" }), 1, "identity kept");
-		assert.deepEqual((await metrics.schemaMismatch.get()).values, [], "error body not parsed");
+		assert.deepEqual(await nonZero(metrics.schemaMismatch), [], "error body not parsed");
 	});
 
 	it("reports a faucet on another chain as a genesis mismatch", async () => {
@@ -695,7 +698,7 @@ describe("faucet and explorer probes", () => {
 			assert.equal(await sample(metrics.explorerLatestBlock), 4637408);
 			assert.equal(await sample(metrics.explorerFinalizedLag), 5);
 			assert.equal(await sample(metrics.explorerSafeMode), 0);
-			assert.deepEqual((await metrics.schemaMismatch.get()).values, []);
+			assert.deepEqual(await nonZero(metrics.schemaMismatch), []);
 
 			clock.advance(EXPLORER_INTERVAL_MS - 1);
 			await settle();
@@ -725,7 +728,7 @@ describe("faucet and explorer probes", () => {
 			assert.equal(await sample(metrics.explorerLatestBlock), undefined);
 			assert.equal(await sample(metrics.explorerFinalizedLag), undefined);
 			assert.equal(await sample(metrics.explorerSafeMode), undefined);
-			assert.deepEqual((await metrics.schemaMismatch.get()).values, [], "error body not parsed");
+			assert.deepEqual(await nonZero(metrics.schemaMismatch), [], "error body not parsed");
 		});
 
 		it("drops a retyped field's series and counts it, and the probe stays ok", async () => {
@@ -748,6 +751,63 @@ describe("faucet and explorer probes", () => {
 			assert.equal(await sample(metrics.explorerLatestBlock), 4637408);
 			assert.equal(await sample(metrics.probeSuccess, { target: "explorer_stats" }), 1);
 		});
+	});
+});
+
+describe("counter series start at 0 (dashboard.md §3)", () => {
+	// Every result a GET probe can report; rpc_error belongs to JSON-RPC only.
+	const GET_RESULTS = [
+		"http_error",
+		"invalid_response",
+		"network_error",
+		"ok",
+		"rate_limited",
+		"timeout",
+	];
+	const RPC_RESULTS = [...GET_RESULTS, "rpc_error"].toSorted();
+	const unused = "http://127.0.0.1:9"; // never contacted: the clock is not advanced
+	let metrics: Metrics;
+	let probes: ProbeLoop | undefined;
+	const options = () => ({ metrics, log: silent, schedule: manualClock().schedule });
+	/** Asserts a target's counters and duration histogram exist at 0, and returns its results. */
+	const zeroTarget = async (target: string, fields: readonly string[]) => {
+		assert.deepEqual(
+			await zeroSeries(metrics.schemaMismatch, { target }, "field"),
+			fields.toSorted(),
+		);
+		const count = "flopwatch_probe_duration_seconds_count";
+		assert.equal(await sample(metrics.probeDuration, { target }, count), 0, target);
+		return zeroSeries(metrics.probeTotal, { target }, "result");
+	};
+
+	beforeEach(async () => {
+		await probes?.stop();
+		probes = undefined;
+		metrics = createMetrics({ defaultMetrics: false });
+	});
+
+	it("for the HTTP RPC probes, before their first run", async () => {
+		probes = startHttpRpcProbes({
+			network: { ...PROFILES.testnet, rpcHttp: unused },
+			...options(),
+		});
+		assert.deepEqual(await zeroTarget("rpc_http", ["genesis", "header", "health"]), RPC_RESULTS);
+	});
+
+	it("for the faucet probes, before their first run", async () => {
+		probes = startFaucetProbes({ network: PROFILES.testnet, faucetUrl: unused, ...options() });
+		assert.deepEqual(await zeroTarget("faucet_limits", LIMITS_FIELDS), GET_RESULTS);
+		assert.deepEqual(await zeroTarget("faucet_health", HEALTH_FIELDS), GET_RESULTS);
+		assert.deepEqual(await zeroTarget("faucet_chain", CHAIN_FIELDS), GET_RESULTS);
+	});
+
+	it("for the explorer probe, before its first run", async () => {
+		probes = startExplorerProbe({
+			network: PROFILES.testnet,
+			explorerApiUrl: unused,
+			...options(),
+		});
+		assert.deepEqual(await zeroTarget("explorer_stats", STATS_FIELDS), GET_RESULTS);
 	});
 });
 

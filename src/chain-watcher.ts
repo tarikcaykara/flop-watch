@@ -14,7 +14,14 @@ import { realSchedule, type Schedule } from "./clock.ts";
 import type { NetworkConfig } from "./config.ts";
 import { REQUEST_TIMEOUT_MS } from "./http.ts";
 import type { Logger } from "./log.ts";
-import type { DisconnectReason, Metrics, ProbeResult } from "./metrics.ts";
+import {
+	DISCONNECT_REASONS,
+	type DisconnectReason,
+	type Metrics,
+	PROBE_RESULTS,
+	type ProbeResult,
+	zeroTargetSeries,
+} from "./metrics.ts";
 import { assertAllowed } from "./rpc-http.ts";
 import { USER_AGENT } from "./version.ts";
 
@@ -37,15 +44,22 @@ const SUBSCRIPTIONS = [
 type SubscriptionKind = (typeof SUBSCRIPTIONS)[number][1];
 
 /** Remote fields this module can report in flopwatch_schema_mismatch_total. */
-type WsField =
-	| "message"
-	| "header"
-	| "genesis"
-	| "chain"
-	| "runtime_version"
-	| "babe_configuration"
-	| "subscription"
-	| "health";
+const WS_FIELDS = [
+	"message",
+	"header",
+	"genesis",
+	"chain",
+	"runtime_version",
+	"babe_configuration",
+	"subscription",
+	"health",
+] as const;
+type WsField = (typeof WS_FIELDS)[number];
+
+/** Every result the WebSocket probe can report: no HTTP status, so no http_error or rate_limited. */
+const WS_RESULTS = PROBE_RESULTS.filter(
+	(result) => result !== "http_error" && result !== "rate_limited",
+);
 
 type Outcome =
 	| { readonly ok: true; readonly value: unknown }
@@ -83,6 +97,13 @@ export function startChainWatcher(options: {
 	const byNetwork = { network: network.name };
 	const probe = { network: network.name, target: "rpc_ws" } as const;
 	const wsTransport = { network: network.name, transport: "ws" } as const;
+
+	zeroTargetSeries(metrics, probe, WS_RESULTS, WS_FIELDS);
+	metrics.wsConnects.inc(byNetwork, 0);
+	for (const reason of DISCONNECT_REASONS) metrics.wsDisconnects.inc({ ...byNetwork, reason }, 0);
+	metrics.headSkippedBlocks.inc(byNetwork, 0);
+	metrics.headRewinds.inc(byNetwork, 0);
+	metrics.blockInterval.zero(byNetwork);
 
 	let stopped = false;
 	let attempt = 0;
