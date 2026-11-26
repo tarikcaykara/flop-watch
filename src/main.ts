@@ -1,13 +1,13 @@
 // Entry point: load the config, start one isolated worker per network (chain watcher, HTTP RPC
-// probes and, when configured, faucet probes), serve /metrics and /healthz, and shut down cleanly
-// on SIGTERM/SIGINT.
+// probes and, when configured, faucet and explorer probes), serve /metrics and /healthz, and shut
+// down cleanly on SIGTERM/SIGINT.
 
 import { createServer, type Server } from "node:http";
 import { startChainWatcher } from "./chain-watcher.ts";
 import { type Config, loadConfig } from "./config.ts";
 import { createLogger, type Logger } from "./log.ts";
 import { createMetrics, type Metrics } from "./metrics.ts";
-import { startFaucetProbes, startHttpRpcProbes } from "./probes.ts";
+import { startExplorerProbe, startFaucetProbes, startHttpRpcProbes } from "./probes.ts";
 import { VERSION } from "./version.ts";
 
 /** Longer than the WebSocket close deadline (5 s), so a half-open peer cannot force exit code 1. */
@@ -72,11 +72,14 @@ async function main(): Promise<void> {
 	}
 	// Each worker handles its own failures, so one network can never stop the other.
 	const workers = config.networks.flatMap((network) => {
-		const { faucetUrl } = network;
+		const { faucetUrl, explorerApiUrl } = network;
 		return [
 			startChainWatcher({ network, metrics, log }),
 			startHttpRpcProbes({ network, metrics, log }),
 			...(faucetUrl === null ? [] : [startFaucetProbes({ network, faucetUrl, metrics, log })]),
+			...(explorerApiUrl === null
+				? []
+				: [startExplorerProbe({ network, explorerApiUrl, metrics, log })]),
 		];
 	});
 	log.info("flop-watch started", {

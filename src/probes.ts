@@ -1,5 +1,5 @@
 // Scheduled HTTP probes (architecture §4, §5, §6): a loop per probe with first-run jitter, no
-// overlapping runs and Retry-After back-off; the HTTP JSON-RPC probes and the faucet probes of one
+// overlapping runs and Retry-After back-off; the HTTP JSON-RPC, faucet and explorer probes of one
 // network.
 
 import type { Gauge } from "@prometheus-io/client";
@@ -21,9 +21,11 @@ import {
 	type ChainField,
 	type HealthField,
 	type LimitsField,
+	parseExplorerStats,
 	parseFaucetChain,
 	parseFaucetHealth,
 	parseFaucetLimits,
+	type StatsField,
 } from "./parse.ts";
 import { rpcCall } from "./rpc-http.ts";
 
@@ -32,6 +34,7 @@ export const RETRY_AFTER_CAP_MS = 10 * 60_000;
 export const RPC_HTTP_INTERVAL_MS = 30_000;
 export const GENESIS_INTERVAL_MS = 10 * 60_000;
 export const FAUCET_INTERVAL_MS = 60_000;
+export const EXPLORER_INTERVAL_MS = 60_000;
 const GENESIS_RE = /^0x[0-9a-f]{64}$/;
 
 export interface ProbeLoop {
@@ -249,6 +252,42 @@ export function startHttpRpcProbes(
 	};
 }
 
+/** The metric writes shared by the GET probes (faucet, explorer) of one network. */
+function getProbeWriter(options: { network: NetworkConfig; metrics: Metrics; log: Logger }) {
+	const { network, metrics, log } = options;
+	const byNetwork = { network: network.name };
+	return {
+		byNetwork,
+		/** Records one request of `target`, with the allowlisted fields its body lacked. */
+		record: (
+			target: Target,
+			outcome: HttpOutcome,
+			mismatches: readonly (LimitsField | HealthField | ChainField | StatsField)[],
+		) => {
+			const labels = { ...byNetwork, target };
+			metrics.probeTotal.inc({ ...labels, result: outcome.result });
+			metrics.probeDuration.observe(labels, outcome.ms / 1000);
+			for (const field of mismatches) metrics.schemaMismatch.inc({ ...labels, field });
+			metrics.probeSuccess.set(labels, outcome.result === "ok" ? 1 : 0);
+			if (outcome.result === "ok") {
+				metrics.probeLastSuccess.set(labels, Date.now() / 1000);
+			} else {
+				log.warn("http probe request failed", {
+					network: network.name,
+					target,
+					result: outcome.result,
+					error: outcome.error,
+				});
+			}
+		},
+		/** Sets a per-network value, or removes its series while the value is unknown. */
+		put: (gauge: Gauge<"network">, value: number | boolean | null) => {
+			if (value === null) gauge.remove(byNetwork);
+			else gauge.set(byNetwork, Number(value));
+		},
+	};
+}
+
 /** Faucet /health answers 503 with its usual JSON body when degraded (architecture §6). */
 const isHealthAnswer = (status: number) => (status >= 200 && status < 300) || status === 503;
 
@@ -261,38 +300,10 @@ const isHealthAnswer = (status: number) => (status >= 200 && status < 300) || st
 export function startFaucetProbes(
 	options: { network: NetworkConfig; faucetUrl: string; metrics: Metrics } & LoopOptions,
 ): ProbeLoop {
-	const { network, faucetUrl, metrics, log } = options;
+	const { network, faucetUrl, metrics } = options;
 	const paced = sharedPause(options.now ?? (() => performance.now()));
-	const byNetwork = { network: network.name };
+	const { byNetwork, record, put } = getProbeWriter(options);
 	let stopped = false;
-
-	/** Records one request of `target`, with the allowlisted fields its body lacked. */
-	const record = (
-		target: Target,
-		outcome: HttpOutcome,
-		mismatches: readonly (LimitsField | HealthField | ChainField)[],
-	) => {
-		const labels = { ...byNetwork, target };
-		metrics.probeTotal.inc({ ...labels, result: outcome.result });
-		metrics.probeDuration.observe(labels, outcome.ms / 1000);
-		for (const field of mismatches) metrics.schemaMismatch.inc({ ...labels, field });
-		metrics.probeSuccess.set(labels, outcome.result === "ok" ? 1 : 0);
-		if (outcome.result === "ok") {
-			metrics.probeLastSuccess.set(labels, Date.now() / 1000);
-		} else {
-			log.warn("faucet request failed", {
-				network: network.name,
-				target,
-				result: outcome.result,
-				error: outcome.error,
-			});
-		}
-	};
-	/** Sets a per-network value, or removes its series while the value is unknown. */
-	const put = (gauge: Gauge<"network">, value: number | boolean | null) => {
-		if (value === null) gauge.remove(byNetwork);
-		else gauge.set(byNetwork, Number(value));
-	};
 
 	const limits = async (): Promise<number | null> => {
 		const outcome = await getJson(`${faucetUrl}/limits`);
@@ -382,6 +393,39 @@ export function startFaucetProbes(
 		stop: async () => {
 			stopped = true;
 			await Promise.all(loops.map((loop) => loop.stop()));
+		},
+	};
+}
+
+/**
+ * The explorer probe of one network (architecture §4, §6): GET <explorer API>/stats every 60 s,
+ * best effort, because the API is undocumented. A non-2xx, such as the Testnet 503 "Era-T reader
+ * unavailable", is http_error and drops the explorer values.
+ */
+export function startExplorerProbe(
+	options: { network: NetworkConfig; explorerApiUrl: string; metrics: Metrics } & LoopOptions,
+): ProbeLoop {
+	const { network, explorerApiUrl, metrics } = options;
+	const { record, put } = getProbeWriter(options);
+	let stopped = false;
+
+	const stats = async (): Promise<number | null> => {
+		const outcome = await getJson(`${explorerApiUrl}/stats`);
+		if (stopped) return null;
+		const parsed = outcome.result === "ok" ? parseExplorerStats(outcome.value) : null;
+		record("explorer_stats", outcome, parsed?.mismatches ?? []);
+		const v = parsed?.value;
+		put(metrics.explorerLatestBlock, v?.latestBlockNumber ?? null);
+		put(metrics.explorerFinalizedLag, v?.finalizedLagBlocks ?? null);
+		put(metrics.explorerSafeMode, v?.safeMode ?? null);
+		return retryAfter(outcome);
+	};
+
+	const loop = startLoop(`${network.name} explorer_stats`, EXPLORER_INTERVAL_MS, stats, options);
+	return {
+		stop: async () => {
+			stopped = true;
+			await loop.stop();
 		},
 	};
 }
