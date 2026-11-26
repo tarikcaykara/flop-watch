@@ -170,4 +170,33 @@ describe("collector process", () => {
 			child.kill("SIGKILL");
 		}
 	});
+
+	it("serves the counters at 0 before any probe runs, and none for disabled probes", {
+		timeout: 20_000,
+	}, async () => {
+		const port = await freePort();
+		const unreachable = await freePort();
+		const { child, started: ready } = runCollector({
+			FLOPWATCH_HOST: "127.0.0.1",
+			FLOPWATCH_PORT: String(port),
+			FLOPWATCH_NETWORKS: "testnet",
+			FLOPWATCH_TESTNET_RPC_WS: `ws://127.0.0.1:${unreachable}`,
+			FLOPWATCH_TESTNET_RPC_HTTP: `http://127.0.0.1:${unreachable}`,
+			FLOPWATCH_TESTNET_FAUCET_URL: "",
+			FLOPWATCH_TESTNET_EXPLORER_API_URL: "",
+		});
+		try {
+			await ready;
+			const body = await (await fetch(`http://127.0.0.1:${port}/metrics`)).text();
+			// A request can only fail against the closed port, so `ok` stays 0 whenever we scrape.
+			assert.match(
+				body,
+				/^flopwatch_probe_total\{network="testnet",target="rpc_http",result="ok"\} 0$/m,
+			);
+			assert.match(body, /^flopwatch_ws_disconnects_total\{network="testnet",reason="error"\} 0$/m);
+			assert.doesNotMatch(body, /target="(faucet_\w+|explorer_stats)"/);
+		} finally {
+			child.kill("SIGKILL");
+		}
+	});
 });

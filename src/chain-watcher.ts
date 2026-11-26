@@ -18,6 +18,7 @@ import {
 	DISCONNECT_REASONS,
 	type DisconnectReason,
 	type Metrics,
+	PROBE_RESULTS,
 	type ProbeResult,
 	zeroTargetSeries,
 } from "./metrics.ts";
@@ -55,14 +56,10 @@ const WS_FIELDS = [
 ] as const;
 type WsField = (typeof WS_FIELDS)[number];
 
-/** Every result the WebSocket probe can report; HTTP statuses do not apply. */
-const WS_RESULTS: readonly ProbeResult[] = [
-	"ok",
-	"timeout",
-	"network_error",
-	"rpc_error",
-	"invalid_response",
-];
+/** Every result the WebSocket probe can report: no HTTP status, so no http_error or rate_limited. */
+const WS_RESULTS = PROBE_RESULTS.filter(
+	(result) => result !== "http_error" && result !== "rate_limited",
+);
 
 type Outcome =
 	| { readonly ok: true; readonly value: unknown }
