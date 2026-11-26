@@ -322,8 +322,8 @@ annotation, because Grafana reads firing alerts from the `ALERTS` series, which 
 
 **Tests.** `prometheus/tests/flop-watch.test.yml` covers every recording rule and alert with
 `promtool test rules`; `pnpm test:rules` runs it, with `promtool check config` and `check rules`,
-in the Prometheus image that `compose.yaml` pins, and the CI gate runs `pnpm test:rules`. The stack
-e2e checks that Prometheus loads all 20 rules and evaluates them without errors.
+in the Prometheus image that `compose.yaml` pins. The CI gate runs it too. The stack e2e checks
+that Prometheus loads all 20 rules and evaluates them without errors.
 
 ## 8. Grafana
 
@@ -417,10 +417,11 @@ e2e checks that Prometheus loads all 20 rules and evaluates them without errors.
 - **Volumes.** Named volumes for Prometheus and Grafana data; `prometheus/` and the Grafana
   provisioning and dashboard folders are bind-mounted read-only from the repository.
 - **Collector image.**
-  - Base `node:24.<minor>.<patch>-alpine` (Node 24 LTS), pinned to an exact version and by digest,
-    so a Dependabot update names the Node release it brings. A build stage installs the production
-    dependencies with `pnpm install --prod --frozen-lockfile`, and the image holds only them,
-    `package.json` and `src/`.
+  - Base `node:24.<minor>.<patch>-alpine` (Node 24 LTS), pinned to an exact version and by digest.
+    A Dependabot version bump names the Node release it brings; when the official image rebuilds
+    the same tag (a new Alpine base, for example), Dependabot proposes the new digest alone. A
+    build stage installs the production dependencies with `pnpm install --prod --frozen-lockfile`,
+    and the image holds only them, `package.json` and `src/`.
   - Runs as the non-root `node` user with `CMD ["node", "src/main.ts"]`.
   - `read_only: true` root filesystem; a healthcheck on `/healthz` at `FLOPWATCH_PORT`.
   - The CI gate builds it on every pull request and every push to `main`.

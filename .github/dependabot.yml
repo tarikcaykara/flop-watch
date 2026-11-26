@@ -4,7 +4,8 @@
 #   merges after the reviewer pass and a green gate; `runtime` (@prometheus-io/client, the only
 #   runtime dependency, still 0.x so a minor can break) and `images` (the Node base image in the
 #   Dockerfile, Prometheus and Grafana in compose.yaml), which the owner merges.
-# - Majors come one by one and the owner merges them.
+# - Majors come one by one and the owner merges them. The owner also merges every other image
+#   update, such as a new digest for the same Node tag.
 version: 2
 updates:
   - package-ecosystem: npm
