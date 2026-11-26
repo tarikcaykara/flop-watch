@@ -21,7 +21,6 @@ const GREY = "#8e8e8e";
 const NONE = "transparent";
 
 const BLOCKS = "suffix: blocks";
-const FLOP = "suffix: FLOP";
 /** Gaps longer than this stay open in time series (§3), in milliseconds. */
 const MAX_GAP_MS = 120_000;
 
@@ -44,9 +43,14 @@ const SPONSOR_CODE = ["open", "automatic_full", "positions_full", "unknown", "ot
 	.join("\n+ ");
 const firing = (severity: string) =>
 	`max by (alertname) (ALERTS{alertstate="firing", severity="${severity}", network=~"$network|"})`;
-const INCIDENTS = [`3 * ${firing("critical")}`, `2 * ${firing("warning")}`, firing("info")].join(
-	"\nor ",
-);
+// With nothing firing, a "No incident" row keeps the timeline from rendering an empty frame,
+// which Grafana reports as "Data does not have a time field".
+const INCIDENTS = [
+	`3 * ${firing("critical")}`,
+	`2 * ${firing("warning")}`,
+	firing("info"),
+	'on() label_replace(vector(0), "alertname", "No incident", "", "")',
+].join("\nor ");
 
 /** Value mappings: each value shows as its text, in its colour. */
 function values(...entries: Array<[number, string, string]>): Json {
@@ -130,6 +134,7 @@ function stat(
 		mappings?: Json[];
 		thresholds?: Obj;
 		textMode?: string;
+		colorMode?: "background" | "none";
 		displayName?: string;
 	},
 ): Spec {
@@ -156,7 +161,7 @@ function stat(
 			},
 			options: {
 				reduceOptions: { calcs: ["lastNotNull"], fields: "", values: false },
-				colorMode: o.textMode === "name" ? "none" : "background",
+				colorMode: o.colorMode ?? (o.textMode === "name" ? "none" : "background"),
 				graphMode: "none",
 				textMode: o.textMode ?? "value",
 				justifyMode: "center",
@@ -181,8 +186,9 @@ function timeline(o: Common & { mappings: Json[]; overrides?: Json[] }): Spec {
 			fieldConfig: {
 				defaults: {
 					mappings: o.mappings,
-					thresholds: steps(GREY),
-					color: { mode: "thresholds" },
+					// Not "thresholds": with merged values, Grafana then shows threshold ranges and skips
+					// the value mappings. Unmapped values stay grey.
+					color: { mode: "fixed", fixedColor: GREY },
 					custom: { fillOpacity: 80, lineWidth: 0, spanNulls: false, insertNulls: MAX_GAP_MS },
 				},
 				overrides: o.overrides ?? [],
@@ -206,6 +212,8 @@ function series(
 		thresholds?: Obj;
 		bars?: boolean;
 		stepped?: boolean;
+		/** Instead of a unit suffix on every tick, for long amounts such as FLOP. */
+		axisLabel?: string;
 		overrides?: Json[];
 	},
 ): Spec {
@@ -236,6 +244,7 @@ function series(
 						insertNulls: MAX_GAP_MS,
 						stacking: { mode: bars ? "normal" : "none", group: "A" },
 						thresholdsStyle: { mode: o.thresholds === undefined ? "off" : "line" },
+						...(o.axisLabel === undefined ? {} : { axisLabel: o.axisLabel }),
 					},
 				},
 				overrides: o.overrides ?? [],
@@ -253,7 +262,13 @@ const flagBars = { "custom.drawStyle": "bars", "custom.axisPlacement": "right", 
 const dashed = { "custom.lineStyle": { fill: "dash", dash: [10, 10] } };
 
 function table(
-	o: Common & { columns: string[]; rename?: Obj; unit?: string; decimals?: number },
+	o: Common & {
+		columns: string[];
+		rename?: Obj;
+		/** A unit for one column only, so text columns stay text. */
+		columnUnit?: { column: string; unit: string };
+		decimals?: number;
+	},
 ): Spec {
 	return {
 		w: o.w,
@@ -270,13 +285,16 @@ function table(
 			],
 			fieldConfig: {
 				defaults: {
-					unit: o.unit ?? "none",
+					unit: "none",
 					...(o.decimals === undefined ? {} : { decimals: o.decimals }),
 					noValue: "No data",
 					color: { mode: "thresholds" },
 					thresholds: steps(GREY),
 				},
-				overrides: [],
+				overrides:
+					o.columnUnit === undefined
+						? []
+						: [byName(o.columnUnit.column, { unit: o.columnUnit.unit })],
 			},
 			options: { showHeader: true, cellHeight: "sm", footer: { show: false } },
 		},
@@ -293,7 +311,7 @@ const CLAIMS_READY =
 
 const about: Spec = {
 	w: 24,
-	h: 3,
+	h: 4,
 	body: {
 		type: "text",
 		title: "About",
@@ -315,7 +333,7 @@ const now: Spec[] = [
 		description:
 			"Measured · `system_health` over flop-watch's RPC WebSocket, every 30 s. Down means the " +
 			"last attempt failed: the health call, the connection, or the setup after connecting.",
-		w: 3,
+		w: 6,
 		h: 4,
 		queries: [{ expr: sel("flopwatch_probe_success", 'target="rpc_ws"'), instant: true }],
 		mappings: UP_DOWN,
@@ -325,7 +343,7 @@ const now: Spec[] = [
 		description:
 			"Measured · `chain_getHeader` and `system_health` over HTTP JSON-RPC, every 30 s. Down " +
 			"means at least one of the two failed in the last cycle.",
-		w: 3,
+		w: 6,
 		h: 4,
 		queries: [{ expr: sel("flopwatch_probe_success", 'target="rpc_http"'), instant: true }],
 		mappings: UP_DOWN,
@@ -335,7 +353,7 @@ const now: Spec[] = [
 		description:
 			"Derived · time since flop-watch received the last new-head notification over the " +
 			"WebSocket. Blocks come every second, so over 30 s means no new block reached us.",
-		w: 3,
+		w: 6,
 		h: 4,
 		queries: [{ expr: sel("flopwatch:best_head_age_seconds"), instant: true }],
 		unit: "s",
@@ -346,7 +364,7 @@ const now: Spec[] = [
 		description:
 			"Derived · best minus finalized block number, from the WebSocket subscriptions. 30 and " +
 			"120 blocks are the yellowpaper's warning and freeze thresholds.",
-		w: 3,
+		w: 6,
 		h: 4,
 		queries: [{ expr: sel("flopwatch:finality_lag_blocks"), instant: true }],
 		unit: BLOCKS,
@@ -355,7 +373,7 @@ const now: Spec[] = [
 	stat({
 		title: "Faucet claims",
 		description: CLAIMS_READY,
-		w: 3,
+		w: 6,
 		h: 4,
 		queries: [{ expr: sel("flopwatch:faucet_claim_ready"), instant: true }],
 		mappings: READY,
@@ -363,7 +381,7 @@ const now: Spec[] = [
 	stat({
 		title: "Faucet status",
 		description: "Reported · `faucet.status` from the faucet's `/limits`, every 60 s.",
-		w: 3,
+		w: 6,
 		h: 4,
 		queries: [{ expr: FAUCET_STATUS_CODE, instant: true }],
 		mappings: FAUCET_STATUS,
@@ -373,7 +391,7 @@ const now: Spec[] = [
 		description:
 			"Measured · GET `/api/stats` on the explorer, every 60 s. Down means the request failed " +
 			"or did not return a JSON object.",
-		w: 3,
+		w: 6,
 		h: 4,
 		queries: [{ expr: sel("flopwatch_probe_success", 'target="explorer_stats"'), instant: true }],
 		mappings: UP_DOWN,
@@ -384,7 +402,7 @@ const now: Spec[] = [
 			"Reported · the genesis hash from the RPC WebSocket, RPC HTTP and the faucet, against the " +
 			"pinned one. A mismatch points to a network reset or an endpoint serving another chain; " +
 			"the Identity row shows which source.",
-		w: 3,
+		w: 6,
 		h: 4,
 		queries: [{ expr: `min(${sel("flopwatch_genesis_match")})`, instant: true }],
 		mappings: [values([1, "Match", GREEN], [0, "Mismatch", RED])],
@@ -401,7 +419,9 @@ const incidents: Spec[][] = [
 			w: 24,
 			h: 8,
 			queries: [{ expr: INCIDENTS, legend: "{{alertname}}" }],
-			mappings: [values([3, "critical", RED], [2, "warning", ORANGE], [1, "info", BLUE])],
+			mappings: [
+				values([3, "critical", RED], [2, "warning", ORANGE], [1, "info", BLUE], [0, "none", GREEN]),
+			],
 		}),
 	],
 	[
@@ -436,7 +456,7 @@ const incidents: Spec[][] = [
 			],
 			columns: ["target", "Value"],
 			rename: { Value: "last success" },
-			unit: "dateTimeFromNow",
+			columnUnit: { column: "last success", unit: "dateTimeFromNow" },
 		}),
 	],
 ];
@@ -566,6 +586,7 @@ const blocks: Spec[][] = [
 				},
 			],
 			textMode: "value_and_name",
+			colorMode: "none",
 		}),
 	],
 	[
@@ -731,7 +752,8 @@ const faucet: Spec[][] = [
 				{ expr: sel("flopwatch_faucet_balance_flop"), legend: "balance" },
 				{ expr: sel("flopwatch_faucet_min_balance_flop"), legend: "minimum" },
 			],
-			unit: FLOP,
+			unit: "short",
+			axisLabel: "FLOP",
 			decimals: 0,
 			overrides: [byName("minimum", dashed)],
 		}),
@@ -745,7 +767,8 @@ const faucet: Spec[][] = [
 				{ expr: sel("flopwatch_faucet_daily_cap_limit_flop"), legend: "limit" },
 				{ expr: sel("flopwatch_faucet_daily_cap_remaining_flop"), legend: "remaining" },
 			],
-			unit: FLOP,
+			unit: "short",
+			axisLabel: "FLOP",
 			decimals: 0,
 			overrides: [byName("limit", dashed)],
 		}),
@@ -979,7 +1002,7 @@ interface Row {
 	readonly lines: Spec[][];
 }
 const ROWS: Row[] = [
-	{ title: "Now", lines: [now] },
+	{ title: "Now", lines: [now.slice(0, 4), now.slice(4)] },
 	{ title: "Incidents", lines: incidents },
 	{ title: "RPC", lines: rpc },
 	{ title: "Blocks and finality", lines: blocks },
