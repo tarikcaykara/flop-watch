@@ -55,6 +55,8 @@ interface ComposeService {
 	readonly command?: readonly string[];
 	readonly read_only?: boolean;
 	readonly ports?: ReadonlyArray<{ host_ip?: string; published?: string; target: number }>;
+	readonly environment?: Record<string, string | null>;
+	readonly volumes?: ReadonlyArray<{ source?: string; target: string; read_only?: boolean }>;
 }
 interface ComposeConfig {
 	readonly services: Record<string, ComposeService>;
@@ -108,6 +110,30 @@ describe("compose.yaml", () => {
 
 	it("runs the collector on a read-only root filesystem", () => {
 		assert.equal(services["flop-watch"]?.read_only, true);
+	});
+
+	it("gives anonymous visitors Viewer access with the §11 hardening", () => {
+		const env = services["grafana"]?.environment ?? {};
+		for (const [key, value] of Object.entries({
+			GF_AUTH_ANONYMOUS_ENABLED: "true",
+			GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer",
+			GF_USERS_ALLOW_SIGN_UP: "false",
+			GF_USERS_VIEWERS_CAN_EDIT: "false",
+			GF_SNAPSHOTS_EXTERNAL_ENABLED: "false",
+			GF_ANALYTICS_REPORTING_ENABLED: "false",
+			GF_ANALYTICS_CHECK_FOR_UPDATES: "false",
+			GF_DASHBOARDS_MIN_REFRESH_INTERVAL: "30s",
+		})) {
+			assert.equal(env[key], value, key);
+		}
+	});
+
+	it("provisions Grafana from the repository, read-only", () => {
+		const mounts = (services["grafana"]?.volumes ?? []).filter((v) => v.read_only);
+		assert.deepEqual(mounts.map((v) => v.target).toSorted(), [
+			"/etc/grafana/dashboards",
+			"/etc/grafana/provisioning",
+		]);
 	});
 });
 
@@ -197,5 +223,85 @@ describe("the stack", { timeout: 600_000 }, () => {
 					.map((p) => `${container.Service} ${p.URL}:${p.PublishedPort}->${p.TargetPort}`);
 			});
 		assert.deepEqual(published, [`grafana 127.0.0.1:${grafanaPort}->3000`]);
+	});
+
+	/** Grafana's HTTP API as an anonymous visitor: no credentials at all. */
+	const grafana = (path: string, init?: RequestInit) =>
+		fetch(`http://127.0.0.1:${grafanaPort}${path}`, init);
+
+	interface Target {
+		readonly expr: string;
+		readonly instant?: boolean;
+		readonly format?: string;
+	}
+	interface Panel {
+		readonly title: string;
+		readonly targets?: readonly Target[];
+		readonly panels?: readonly Panel[];
+	}
+
+	it("serves the dashboard to anonymous visitors, read-only, as the home page", async () => {
+		const response = await grafana("/api/dashboards/uid/flop-watch-overview");
+		assert.equal(response.status, 200);
+		const body: {
+			dashboard: { title: string };
+			meta: { canSave: boolean; canEdit: boolean };
+		} = JSON.parse(await response.text());
+		assert.equal(body.dashboard.title, "FLOP Network health — flop-watch");
+		assert.equal(body.meta.canSave, false);
+		assert.equal(body.meta.canEdit, false);
+
+		const save = await grafana("/api/dashboards/db", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ dashboard: { ...body.dashboard, title: "changed" }, overwrite: true }),
+		});
+		assert.ok([401, 403].includes(save.status), `saving answered ${save.status}`);
+
+		const home: { dashboard: { uid?: string } } = JSON.parse(
+			await (await grafana("/api/dashboards/home")).text(),
+		);
+		assert.equal(home.dashboard.uid, "flop-watch-overview");
+	});
+
+	it("runs every panel query without errors, as an anonymous visitor", async () => {
+		const { dashboard }: { dashboard: { panels: readonly Panel[] } } = JSON.parse(
+			await (await grafana("/api/dashboards/uid/flop-watch-overview")).text(),
+		);
+		const panels = dashboard.panels.flatMap((p) => [p, ...(p.panels ?? [])]);
+		const targets = panels.flatMap((p) => (p.targets ?? []).map((t) => ({ panel: p.title, ...t })));
+		assert.ok(targets.length > 40, `${targets.length} queries`);
+		for (const target of targets) {
+			const response = await grafana("/api/ds/query", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					from: "now-1h",
+					to: "now",
+					queries: [
+						{
+							refId: "A",
+							datasource: { type: "prometheus", uid: "prometheus" },
+							expr: target.expr.replaceAll("$network", "testnet"),
+							instant: target.instant === true,
+							range: target.instant !== true,
+							format: target.format ?? "time_series",
+							intervalMs: 60_000,
+							maxDataPoints: 500,
+						},
+					],
+				}),
+			});
+			const result: { results?: { A?: { error?: string } } } = JSON.parse(await response.text());
+			assert.equal(response.status, 200, `${target.panel}: ${target.expr}`);
+			assert.equal(result.results?.A?.error, undefined, `${target.panel}: ${target.expr}`);
+		}
+	});
+
+	it("enforces a 30 s minimum refresh", async () => {
+		const settings: { minRefreshInterval?: string } = JSON.parse(
+			await (await grafana("/api/frontend/settings")).text(),
+		);
+		assert.equal(settings.minRefreshInterval, "30s");
 	});
 });
