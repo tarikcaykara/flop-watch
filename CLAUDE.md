@@ -51,7 +51,7 @@ Everything in the repo is English: code, comments, docs, commits, issues and PRs
 | Metrics | `@prometheus-io/client` (only runtime dependency) |
 | Transport | Global `fetch` and `WebSocket`, raw JSON-RPC 2.0 |
 | HTTP server | `node:http` |
-| Tests | `node:test`, offline, with recorded fixtures; `ws` (dev only) as the fake RPC node; timers injected, never mocked globally |
+| Tests | `node:test`, offline, with recorded fixtures; `ws` (dev only) as the fake RPC node and in the stack e2e's fake FLOP service; timers injected, never mocked globally |
 | Lint / format | Biome |
 | Stack | Prometheus + Grafana, Docker Compose |
 
@@ -75,10 +75,10 @@ pnpm dashboard    # regenerate grafana/dashboards/ from grafana/dashboard.ts, fr
 ```
 
 The gate is `pnpm check && pnpm typecheck && pnpm test && pnpm audit:deps`. Run it before every
-push. CI runs the same plus `pnpm test:rules` and `docker build .`, with the audit last. Run
-`pnpm test:rules` and `pnpm test:e2e` too before pushing a change to the Dockerfile,
-`compose.yaml`, `prometheus/` or `grafana/`, and `docker build .` before pushing a change to
-`package.json` or `pnpm-lock.yaml`; CI runs the e2e from #38.
+push. CI runs the same plus `pnpm test:rules` and `docker build .`, with the audit last, and runs
+`pnpm test:e2e` in a separate job. Run `pnpm test:rules` and `pnpm test:e2e` too before pushing a
+change to the Dockerfile, `compose.yaml`, `prometheus/`, `grafana/` or `test/e2e/`, and
+`docker build .` before pushing a change to `package.json` or `pnpm-lock.yaml`.
 
 ## Workflow
 
@@ -108,8 +108,8 @@ push. CI runs the same plus `pnpm test:rules` and `docker build .`, with the aud
     probes and the chain watcher against local fake servers, and a process test of the real
     collector;
   - rules (`pnpm test:rules`; `prometheus/tests/*.yml`): recording rules and alerts;
-  - stack e2e (`pnpm test:e2e`, Docker; `test/e2e/*.e2e.ts`): the Compose stack, Prometheus and
-    Grafana, with no FLOP host contacted.
+  - stack e2e (`pnpm test:e2e`, Docker; `test/e2e/*.e2e.ts`): the Compose stack against the fake
+    FLOP service (`test/e2e/fake-flop.ts`), Prometheus and Grafana, with no FLOP host contacted.
 - **Reviewer-agent pass.** Before a PR is merged or handed to the owner, an agent that did not
   write the change reviews its diff. Fix or answer every finding, and summarise the review in the
   PR body.

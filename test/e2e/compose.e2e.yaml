@@ -1,13 +1,45 @@
-# The e2e stack (`pnpm test:e2e`): the collector talks to no FLOP host. Its endpoints are a
-# closed local port, so every probe fails at once and the stack itself is what gets tested.
+# The e2e stack (`pnpm test:e2e`): the collector talks only to the fake FLOP service, which serves
+# both networks from the recorded fixtures, so no FLOP host is contacted (architecture §10).
 services:
   flop-watch:
     # Its own tag, so the e2e never replaces the image of a stack the developer runs.
     image: flop-watch:e2e
     env_file: !reset []
+    depends_on:
+      fake-flop:
+        condition: service_healthy
     environment:
-      FLOPWATCH_NETWORKS: testnet
-      FLOPWATCH_TESTNET_RPC_WS: ws://127.0.0.1:9
-      FLOPWATCH_TESTNET_RPC_HTTP: http://127.0.0.1:9
-      FLOPWATCH_TESTNET_FAUCET_URL: ""
-      FLOPWATCH_TESTNET_EXPLORER_API_URL: ""
+      FLOPWATCH_NETWORKS: devnet,testnet
+      FLOPWATCH_DEVNET_RPC_WS: ws://fake-flop:8080/devnet
+      FLOPWATCH_DEVNET_RPC_HTTP: http://fake-flop:8080/devnet
+      FLOPWATCH_DEVNET_FAUCET_URL: http://fake-flop:8080/devnet/faucet
+      FLOPWATCH_DEVNET_EXPLORER_API_URL: http://fake-flop:8080/devnet/api
+      FLOPWATCH_TESTNET_RPC_WS: ws://fake-flop:8080/testnet
+      FLOPWATCH_TESTNET_RPC_HTTP: http://fake-flop:8080/testnet
+      FLOPWATCH_TESTNET_FAUCET_URL: http://fake-flop:8080/testnet/faucet
+      FLOPWATCH_TESTNET_EXPLORER_API_URL: http://fake-flop:8080/testnet/api
+      # Empty keeps the built-in genesis; the genesis-mismatch test sets a wrong one.
+      FLOPWATCH_TESTNET_EXPECTED_GENESIS: ${E2E_TESTNET_EXPECTED_GENESIS:-}
+
+  fake-flop:
+    # The collector's image, which the flop-watch service builds: the Node runtime, so no other
+    # image is pinned. The fake and the fixtures it reads come from the repository, read-only.
+    image: flop-watch:e2e
+    pull_policy: never
+    command: ["node", "/repo/test/e2e/fake-flop.ts"]
+    volumes:
+      - ./package.json:/repo/package.json:ro
+      - ./node_modules:/repo/node_modules:ro
+      - ./src:/repo/src:ro
+      - ./test:/repo/test:ro
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8080/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      start_interval: 1s
+    # Not published: only the collector talks to it, on the Compose network.
