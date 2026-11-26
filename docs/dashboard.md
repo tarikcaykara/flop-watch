@@ -58,10 +58,10 @@ rows are collapsed, and Grafana runs no query for a collapsed row until a viewer
   `increase(…[$__interval])` with a minimum interval of 1 min and no decimals, so one event falls
   into one bar.
 - **Counters start at 0.** `increase()` misses a counter's first event when the series appears
-  with value 1. The collector therefore creates every bounded counter series at 0 at startup:
-  each target's results, the WebSocket disconnect reasons, connects, skipped blocks, rewinds and
-  each allowlisted schema-mismatch field. That adds about 150 series for two networks, within the
-  limit of architecture §6. This is a collector change, tracked in #35.
+  with value 1. Each collector worker therefore creates its bounded counter series at 0 when it
+  starts (#35): each target's possible results and schema-mismatch fields, the WebSocket
+  connects, disconnect reasons, skipped blocks and rewinds, and the probe-duration and
+  block-interval histograms. Architecture §6 has the resulting series count.
 - **Per-series mappings.** When one panel shows series whose values mean different things, such
   as F3 (status code and stale flag) and F8 (HTTP status and `ready`), each series gets its own
   value mapping through a field override.
