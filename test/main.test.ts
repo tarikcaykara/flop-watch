@@ -132,7 +132,7 @@ describe("collector process", () => {
 			FLOPWATCH_TESTNET_RPC_WS: `ws://127.0.0.1:${unreachable}`,
 			FLOPWATCH_TESTNET_RPC_HTTP: `http://127.0.0.1:${unreachable}`,
 			FLOPWATCH_TESTNET_FAUCET_URL: `http://127.0.0.1:${unreachable}/faucet`,
-			FLOPWATCH_TESTNET_EXPLORER_API_URL: "",
+			FLOPWATCH_TESTNET_EXPLORER_API_URL: `http://127.0.0.1:${unreachable}/api`,
 		});
 		try {
 			await ready;
@@ -144,11 +144,16 @@ describe("collector process", () => {
 			await eventually(
 				async () => {
 					const body = await scrape();
-					return ["rpc_ws", "rpc_http", "faucet_limits", "faucet_health", "faucet_chain"].every(
-						(target) => body.includes(series(target)),
-					);
+					return [
+						"rpc_ws",
+						"rpc_http",
+						"faucet_limits",
+						"faucet_health",
+						"faucet_chain",
+						"explorer_stats",
+					].every((target) => body.includes(series(target)));
 				},
-				"chain watcher, HTTP RPC and faucet probes running",
+				"every worker running",
 				8_000,
 			);
 

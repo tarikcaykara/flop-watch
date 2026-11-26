@@ -8,11 +8,13 @@ import { PROFILES } from "../src/config.ts";
 import { createLogger } from "../src/log.ts";
 import { createMetrics, type Metrics } from "../src/metrics.ts";
 import {
+	EXPLORER_INTERVAL_MS,
 	FAUCET_INTERVAL_MS,
 	GENESIS_INTERVAL_MS,
 	type ProbeLoop,
 	RETRY_AFTER_CAP_MS,
 	RPC_HTTP_INTERVAL_MS,
+	startExplorerProbe,
 	startFaucetProbes,
 	startHttpRpcProbes,
 	startLoop,
@@ -356,7 +358,7 @@ describe("startHttpRpcProbes", () => {
 	});
 });
 
-describe("startFaucetProbes", () => {
+describe("faucet and explorer probes", () => {
 	interface Answer {
 		readonly status: number;
 		/** A string is sent as is; anything else as JSON. */
@@ -664,6 +666,88 @@ describe("startFaucetProbes", () => {
 		clock.advance(120_000 - FAUCET_INTERVAL_MS);
 		await recorded(6);
 		assert.deepEqual([count("/limits"), count("/health"), count("/chain")], [2, 2, 2]);
+	});
+
+	describe("explorer /api/stats", () => {
+		const stats = (status: 200 | 503, body: unknown) => ({ "/api/stats": { status, body } });
+		const startExplorer = () => {
+			probes = startExplorerProbe({
+				network: PROFILES.devnet,
+				explorerApiUrl: `${url}/api`,
+				metrics,
+				log: silent,
+				schedule: clock.schedule,
+				now: clock.now,
+				random: () => 0,
+			});
+			clock.advance(0);
+		};
+
+		it("GETs <explorer API>/stats every 60 s and exports what it reports", async () => {
+			answers = stats(200, serviceBody("devnet", "explorer_stats", 200));
+			startExplorer();
+			await recorded(1);
+			assert.deepEqual(
+				requests.map((r) => `${r.method} ${r.path}`),
+				["GET /api/stats"],
+			);
+			assert.equal(await sample(metrics.probeSuccess, { target: "explorer_stats" }), 1);
+			assert.equal(await sample(metrics.explorerLatestBlock), 4637408);
+			assert.equal(await sample(metrics.explorerFinalizedLag), 5);
+			assert.equal(await sample(metrics.explorerSafeMode), 0);
+			assert.deepEqual((await metrics.schemaMismatch.get()).values, []);
+
+			clock.advance(EXPLORER_INTERVAL_MS - 1);
+			await settle();
+			assert.equal(requests.length, 1, "nothing before 60 s");
+			clock.advance(1);
+			await recorded(2);
+		});
+
+		it("records the Testnet 503 as http_error and drops the explorer values", async () => {
+			answers = stats(200, serviceBody("devnet", "explorer_stats", 200));
+			startExplorer();
+			await recorded(1);
+			const lastSuccess = await sample(metrics.probeLastSuccess, { target: "explorer_stats" });
+
+			answers = stats(503, serviceBody("testnet", "explorer_stats", 503));
+			clock.advance(EXPLORER_INTERVAL_MS);
+			await recorded(2);
+			assert.equal(
+				await sample(metrics.probeTotal, { target: "explorer_stats", result: "http_error" }),
+				1,
+			);
+			assert.equal(await sample(metrics.probeSuccess, { target: "explorer_stats" }), 0);
+			assert.equal(
+				await sample(metrics.probeLastSuccess, { target: "explorer_stats" }),
+				lastSuccess,
+			);
+			assert.equal(await sample(metrics.explorerLatestBlock), undefined);
+			assert.equal(await sample(metrics.explorerFinalizedLag), undefined);
+			assert.equal(await sample(metrics.explorerSafeMode), undefined);
+			assert.deepEqual((await metrics.schemaMismatch.get()).values, [], "error body not parsed");
+		});
+
+		it("drops a retyped field's series and counts it, and the probe stays ok", async () => {
+			const body = withField(
+				serviceBody("devnet", "explorer_stats", 200),
+				"finality.safeMode",
+				"no",
+			);
+			answers = stats(200, body);
+			startExplorer();
+			await recorded(1);
+			assert.equal(
+				await sample(metrics.schemaMismatch, {
+					target: "explorer_stats",
+					field: "finality.safeMode",
+				}),
+				1,
+			);
+			assert.equal(await sample(metrics.explorerSafeMode), undefined);
+			assert.equal(await sample(metrics.explorerLatestBlock), 4637408);
+			assert.equal(await sample(metrics.probeSuccess, { target: "explorer_stats" }), 1);
+		});
 	});
 });
 
