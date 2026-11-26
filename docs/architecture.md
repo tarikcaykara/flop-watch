@@ -322,8 +322,8 @@ annotation, because Grafana reads firing alerts from the `ALERTS` series, which 
 
 **Tests.** `prometheus/tests/flop-watch.test.yml` covers every recording rule and alert with
 `promtool test rules`; `pnpm test:rules` runs it, with `promtool check config` and `check rules`,
-in the Prometheus image that `compose.yaml` pins. The stack e2e checks that Prometheus loads all 20
-rules and evaluates them without errors.
+in the Prometheus image that `compose.yaml` pins. The CI gate runs it too. The stack e2e checks
+that Prometheus loads all 20 rules and evaluates them without errors.
 
 ## 8. Grafana
 
@@ -417,11 +417,14 @@ rules and evaluates them without errors.
 - **Volumes.** Named volumes for Prometheus and Grafana data; `prometheus/` and the Grafana
   provisioning and dashboard folders are bind-mounted read-only from the repository.
 - **Collector image.**
-  - Base `node:24-alpine`, pinned by digest; a build stage installs the production dependencies
-    with `pnpm install --prod --frozen-lockfile`, and the image holds only them, `package.json`
-    and `src/`.
+  - Base `node:24.<minor>.<patch>-alpine` (Node 24 LTS), pinned to an exact version and by digest.
+    A Dependabot version bump names the Node release it brings; when the official image rebuilds
+    the same tag (a new Alpine base, for example), Dependabot proposes the new digest alone. A
+    build stage installs the production dependencies with `pnpm install --prod --frozen-lockfile`,
+    and the image holds only them, `package.json` and `src/`.
   - Runs as the non-root `node` user with `CMD ["node", "src/main.ts"]`.
   - `read_only: true` root filesystem; a healthcheck on `/healthz` at `FLOPWATCH_PORT`.
+  - The CI gate builds it on every pull request and every push to `main`.
 - **Stack e2e.** `pnpm test:e2e` (needs Docker) checks `compose.yaml` and runs the stack with
   `test/e2e/compose.e2e.yaml`, which points the collector at a closed local port, so no FLOP host
   is contacted. #38 adds a fake FLOP service and runs it in CI.
@@ -463,8 +466,9 @@ rules and evaluates them without errors.
     Grafana's database. No setting turns this off; the public instance (M4) blocks the path at its
     reverse proxy or accepts the risk.
   - Public dashboards exist in Grafana 13, but only an admin can create one.
-- **Supply chain.** One runtime dependency, a committed lockfile, images pinned to exact versions,
-  and Dependabot or manual updates.
+- **Supply chain.** One runtime dependency, a committed lockfile, images pinned to exact versions
+  (the Node base image by digest too), and monthly Dependabot version updates for npm, GitHub
+  Actions, the Dockerfile and `compose.yaml`.
 - **No personal data.** Metrics and logs contain no addresses. The faucet signer address in the
   `/limits` and `/health` bodies is never exported, and a failed faucet or explorer request logs
   only the body's `error` string, never the body.

@@ -2,9 +2,10 @@
 # - A release is proposed only after a 7-day cooldown; security updates do not wait.
 # - Minor and patch updates are grouped: `tooling` (dev dependencies) and `actions`, which Claude
 #   merges after the reviewer pass and a green gate; `runtime` (@prometheus-io/client, the only
-#   runtime dependency, still 0.x so a minor can break), which the owner merges.
-# - Majors come one by one and the owner merges them.
-# - Docker images are added with the Dockerfile (#15).
+#   runtime dependency, still 0.x so a minor can break) and `images` (the Node base image in the
+#   Dockerfile, Prometheus and Grafana in compose.yaml), which the owner merges.
+# - Majors come one by one and the owner merges them. The owner also merges every other image
+#   update, such as a new digest for the same Node tag.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -38,4 +39,32 @@ updates:
       include: scope
     groups:
       actions:
+        update-types: [minor, patch]
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      images:
+        update-types: [minor, patch]
+    ignore:
+      # The base image follows the Node runtime (24 LTS); a new major is a deliberate runtime change.
+      - dependency-name: node
+        update-types: [version-update:semver-major]
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      images:
         update-types: [minor, patch]
