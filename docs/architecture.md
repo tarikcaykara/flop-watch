@@ -314,10 +314,15 @@ annotation, because Grafana reads firing alerts from the `ALERTS` series, which 
 
 - 30 and 120 blocks come from the yellowpaper
   ([params](https://raw.githubusercontent.com/flop-labs/yellowpaper/main/params/flop-protocol-params.yaml)).
-- All other thresholds and `for` durations are **proposed defaults**, and the rules file labels them
-  that way.
+- All other thresholds and `for` durations are **proposed defaults**. The rules file says so in a
+  header comment, and each such alert's summary ends with "(proposed default)".
 - `FlopFaucetLimitsStale` uses 300 s with `for: 5m` because the observed `asOf` age already swings
   between 0.4 and 5.4 min in normal operation (research.md §10.3).
+
+**Tests.** `prometheus/tests/flop-watch.test.yml` covers every recording rule and alert with
+`promtool test rules`; `pnpm test:rules` runs it, with `promtool check config` and `check rules`,
+in the Prometheus image that `compose.yaml` pins. The stack e2e checks that Prometheus loads all 20
+rules and evaluates them without errors.
 
 ## 8. Grafana
 
