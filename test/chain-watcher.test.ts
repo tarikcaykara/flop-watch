@@ -17,9 +17,9 @@ import {
 	WATCHDOG_MS,
 } from "../src/chain-watcher.ts";
 import { PROFILES } from "../src/config.ts";
+import { REQUEST_TIMEOUT_MS } from "../src/http.ts";
 import { createLogger } from "../src/log.ts";
 import { createMetrics, type Metrics } from "../src/metrics.ts";
-import { REQUEST_TIMEOUT_MS } from "../src/rpc-http.ts";
 import { eventually, type ManualClock, manualClock, sample } from "./helpers.ts";
 
 interface Fixtures {

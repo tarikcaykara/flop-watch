@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createServer, type ServerResponse } from "node:http";
 import { after, before, beforeEach, describe, it } from "node:test";
 import type { RpcHeader } from "../src/babe.ts";
@@ -8,14 +8,24 @@ import { PROFILES } from "../src/config.ts";
 import { createLogger } from "../src/log.ts";
 import { createMetrics, type Metrics } from "../src/metrics.ts";
 import {
+	FAUCET_INTERVAL_MS,
 	GENESIS_INTERVAL_MS,
 	type ProbeLoop,
 	RETRY_AFTER_CAP_MS,
 	RPC_HTTP_INTERVAL_MS,
+	startFaucetProbes,
 	startHttpRpcProbes,
 	startLoop,
 } from "../src/probes.ts";
-import { eventually, type ManualClock, manualClock, sample } from "./helpers.ts";
+import {
+	eventually,
+	type ManualClock,
+	manualClock,
+	REMOVE,
+	sample,
+	serviceBody,
+	withField,
+} from "./helpers.ts";
 
 const silent = createLogger("error", () => {});
 /** Lets the promise continuations of a finished run (rescheduling, metric writes) happen. */
@@ -343,5 +353,329 @@ describe("startHttpRpcProbes", () => {
 		assert.equal(received.filter((m) => m === "chain_getHeader").length, 1, "paused at 30 s");
 		clock.advance(120_000 - RPC_HTTP_INTERVAL_MS);
 		await eventually(() => received.filter((m) => m === "chain_getHeader").length === 2, "resumed");
+	});
+});
+
+describe("startFaucetProbes", () => {
+	interface Answer {
+		readonly status: number;
+		/** A string is sent as is; anything else as JSON. */
+		readonly body: unknown;
+		readonly headers?: Record<string, string>;
+	}
+	const requests: Array<{ method: string | undefined; path: string; userAgent: string }> = [];
+	let answers: Record<string, Answer> = {};
+	const server = createServer((req, res) => {
+		const path = req.url ?? "";
+		requests.push({ method: req.method, path, userAgent: req.headers["user-agent"] ?? "" });
+		const answer = answers[path];
+		if (answer === undefined) {
+			res.writeHead(404).end();
+			return;
+		}
+		res
+			.writeHead(answer.status, { "content-type": "application/json", ...answer.headers })
+			.end(typeof answer.body === "string" ? answer.body : JSON.stringify(answer.body));
+	});
+	let url = "";
+	let clock: ManualClock;
+	let metrics: Metrics;
+	let probes: ProbeLoop | undefined;
+
+	const devnetAnswers = (): Record<string, Answer> => ({
+		"/limits": { status: 200, body: serviceBody("devnet", "faucet_limits", 200) },
+		"/health": { status: 200, body: serviceBody("devnet", "faucet_health", 200) },
+		"/chain": { status: 200, body: serviceBody("devnet", "faucet_chain", 200) },
+	});
+	const testnetAnswers = (): Record<string, Answer> => ({
+		"/limits": { status: 200, body: serviceBody("testnet", "faucet_limits", 200) },
+		"/health": {
+			status: 503,
+			body: serviceBody("testnet", "faucet_health", 503),
+			headers: { "retry-after": "60" },
+		},
+		"/chain": { status: 200, body: serviceBody("testnet", "faucet_chain", 200) },
+	});
+	const startProbes = (network: "devnet" | "testnet") => {
+		probes = startFaucetProbes({
+			network: PROFILES[network],
+			faucetUrl: url,
+			metrics,
+			log: silent,
+			schedule: clock.schedule,
+			now: clock.now,
+			random: () => 0,
+		});
+		clock.advance(0);
+	};
+	/** Waits until `n` requests have been recorded, then lets the loops reschedule. */
+	const recorded = async (n: number) => {
+		await eventually(async () => {
+			const { values } = await metrics.probeTotal.get();
+			return values.reduce((sum, v) => sum + v.value, 0) === n;
+		}, `${n} requests recorded`);
+		await settle();
+	};
+	const count = (path: string) => requests.filter((r) => r.path === path).length;
+
+	before(async () => {
+		server.listen(0, "127.0.0.1");
+		await once(server, "listening");
+		const address = server.address();
+		assert.ok(address && typeof address === "object");
+		url = `http://127.0.0.1:${address.port}`;
+	});
+	after(() => {
+		server.closeAllConnections();
+		server.close();
+	});
+	beforeEach(async () => {
+		await probes?.stop();
+		probes = undefined;
+		requests.length = 0;
+		clock = manualClock();
+		metrics = createMetrics({ defaultMetrics: false });
+	});
+
+	it("GETs /limits, /health and /chain every 60 s and exports what they report (open)", async () => {
+		answers = devnetAnswers();
+		startProbes("devnet");
+		await recorded(3);
+		assert.deepEqual(requests.map((r) => `${r.method} ${r.path}`).toSorted(), [
+			"GET /chain",
+			"GET /health",
+			"GET /limits",
+		]);
+		for (const { userAgent } of requests) assert.match(userAgent, /^flop-watch\//);
+		for (const target of ["faucet_limits", "faucet_health", "faucet_chain"]) {
+			assert.equal(await sample(metrics.probeSuccess, { target }), 1, target);
+			assert.ok(((await sample(metrics.probeLastSuccess, { target })) ?? 0) > 0, target);
+		}
+
+		assert.equal(await sample(metrics.faucetStatus, { status: "open" }), 1);
+		assert.equal(await sample(metrics.faucetStatus, { status: "unknown" }), 0);
+		assert.equal(await sample(metrics.faucetStale), 0);
+		assert.equal(
+			await sample(metrics.faucetLimitsAsOf),
+			Date.parse("2026-11-25T19:00:09.361Z") / 1000,
+		);
+		assert.equal(await sample(metrics.faucetBalance), 30482522);
+		assert.equal(await sample(metrics.faucetMinBalance), 10000000);
+		assert.equal(await sample(metrics.faucetDailyCapLimit), 10000000);
+		assert.equal(await sample(metrics.faucetDailyCapUsed), 3323710);
+		assert.equal(await sample(metrics.faucetDailyCapRemaining), 6676290);
+		assert.equal(await sample(metrics.faucetPendingGrants), 0);
+		const sponsor = (lane: string, status: string) =>
+			sample(metrics.faucetSponsorStatus, { lane, status });
+		assert.equal(await sponsor("miner", "positions_full"), 1);
+		assert.equal(await sponsor("miner", "open"), 0);
+		assert.equal(await sponsor("validator", "open"), 1);
+
+		assert.equal(await sample(metrics.faucetHealthReady), 0);
+		assert.equal(await sample(metrics.faucetHealthStatusCode), 200);
+		const dependency = (name: string) => sample(metrics.faucetDependencyOk, { dependency: name });
+		assert.equal(await dependency("signer"), 1);
+		assert.equal(await dependency("funding"), 0);
+		assert.equal(await dependency("signing"), undefined, "signing has no ok");
+		assert.equal(await sample(metrics.faucetIndexerLag), 2);
+
+		assert.equal(await sample(metrics.genesisMatch, { source: "faucet" }), 1);
+		assert.deepEqual((await metrics.schemaMismatch.get()).values, []);
+
+		clock.advance(FAUCET_INTERVAL_MS - 1);
+		await settle();
+		assert.equal(requests.length, 3, "nothing before 60 s");
+		clock.advance(1);
+		await recorded(6);
+		assert.deepEqual([count("/limits"), count("/health"), count("/chain")], [2, 2, 2]);
+	});
+
+	it("reports faucet.status low_balance", async () => {
+		const limits = withField(
+			serviceBody("devnet", "faucet_limits", 200),
+			"faucet.status",
+			"low_balance",
+		);
+		answers = { ...devnetAnswers(), "/limits": { status: 200, body: limits } };
+		startProbes("devnet");
+		await recorded(3);
+		assert.equal(await sample(metrics.faucetStatus, { status: "low_balance" }), 1);
+		assert.equal(await sample(metrics.faucetStatus, { status: "open" }), 0);
+	});
+
+	it("reports the unknown shape: faucet and both sponsor lanes unknown", async () => {
+		// The shape seen with faucet.status "unknown" (research §6).
+		let limits = withField(serviceBody("devnet", "faucet_limits", 200), "faucet.status", "unknown");
+		for (const lane of ["miner", "validator"]) {
+			limits = withField(limits, `sponsor.${lane}`, {
+				status: "unknown",
+				reason: "sponsor_unavailable",
+			});
+		}
+		answers = { ...devnetAnswers(), "/limits": { status: 200, body: limits } };
+		startProbes("devnet");
+		await recorded(3);
+		assert.equal(await sample(metrics.faucetStatus, { status: "unknown" }), 1);
+		assert.equal(await sample(metrics.faucetStatus, { status: "open" }), 0);
+		for (const lane of ["miner", "validator"]) {
+			assert.equal(await sample(metrics.faucetSponsorStatus, { lane, status: "unknown" }), 1);
+			assert.equal(await sample(metrics.faucetSponsorStatus, { lane, status: "open" }), 0);
+		}
+		assert.equal(await sample(metrics.faucetBalance), 30482522);
+		assert.deepEqual((await metrics.schemaMismatch.get()).values, []);
+	});
+
+	it("takes a 503 /health with Retry-After: 60 as a valid answer that pauses nothing", async () => {
+		answers = testnetAnswers();
+		startProbes("testnet");
+		await recorded(3);
+		assert.equal(await sample(metrics.probeTotal, { target: "faucet_health", result: "ok" }), 1);
+		assert.equal(await sample(metrics.probeSuccess, { target: "faucet_health" }), 1);
+		assert.equal(await sample(metrics.faucetHealthStatusCode), 503);
+		assert.equal(await sample(metrics.faucetHealthReady), 0);
+		assert.equal(await sample(metrics.faucetDependencyOk, { dependency: "indexer" }), 0);
+		assert.equal(await sample(metrics.faucetDependencyOk, { dependency: "signer" }), 1);
+		assert.equal(await sample(metrics.faucetIndexerLag), undefined);
+
+		clock.advance(FAUCET_INTERVAL_MS);
+		await recorded(6);
+		assert.deepEqual([count("/limits"), count("/health"), count("/chain")], [2, 2, 2]);
+	});
+
+	it("fails /chain on a 503 and keeps the faucet genesis match", async () => {
+		answers = testnetAnswers();
+		startProbes("testnet");
+		await recorded(3);
+		assert.equal(await sample(metrics.genesisMatch, { source: "faucet" }), 1);
+
+		answers["/chain"] = { status: 503, body: serviceBody("testnet", "faucet_chain", 503) };
+		clock.advance(FAUCET_INTERVAL_MS);
+		await recorded(6);
+		assert.equal(
+			await sample(metrics.probeTotal, { target: "faucet_chain", result: "http_error" }),
+			1,
+		);
+		assert.equal(await sample(metrics.probeSuccess, { target: "faucet_chain" }), 0);
+		assert.equal(await sample(metrics.probeSuccess, { target: "faucet_limits" }), 1);
+		assert.equal(await sample(metrics.genesisMatch, { source: "faucet" }), 1, "identity kept");
+		assert.deepEqual((await metrics.schemaMismatch.get()).values, [], "error body not parsed");
+	});
+
+	it("reports a faucet on another chain as a genesis mismatch", async () => {
+		answers = devnetAnswers();
+		startProbes("testnet");
+		await recorded(3);
+		assert.equal(await sample(metrics.genesisMatch, { source: "faucet" }), 0);
+		assert.equal(await sample(metrics.probeSuccess, { target: "faucet_chain" }), 1);
+	});
+
+	it("drops a target's values when its request fails, and keeps its last success time", async () => {
+		answers = devnetAnswers();
+		startProbes("devnet");
+		await recorded(3);
+		const lastSuccess = await sample(metrics.probeLastSuccess, { target: "faucet_limits" });
+
+		answers = {
+			...answers,
+			"/limits": { status: 502, body: "<html>bad gateway</html>" },
+			"/health": { status: 404, body: { error: "not found" } },
+		};
+		clock.advance(FAUCET_INTERVAL_MS);
+		await recorded(6);
+		assert.equal(
+			await sample(metrics.probeTotal, { target: "faucet_limits", result: "http_error" }),
+			1,
+		);
+		assert.equal(await sample(metrics.probeSuccess, { target: "faucet_limits" }), 0);
+		assert.equal(await sample(metrics.probeLastSuccess, { target: "faucet_limits" }), lastSuccess);
+		assert.equal(await sample(metrics.faucetStatus), undefined);
+		assert.equal(await sample(metrics.faucetStale), undefined);
+		assert.equal(await sample(metrics.faucetLimitsAsOf), undefined);
+		assert.equal(await sample(metrics.faucetBalance), undefined);
+		assert.equal(await sample(metrics.faucetSponsorStatus), undefined);
+
+		assert.equal(
+			await sample(metrics.probeTotal, { target: "faucet_health", result: "http_error" }),
+			1,
+			"a 404 is no /health answer",
+		);
+		assert.equal(await sample(metrics.faucetHealthStatusCode), 404, "measured on failures too");
+		assert.equal(await sample(metrics.faucetHealthReady), undefined);
+		assert.equal(await sample(metrics.faucetDependencyOk), undefined);
+		assert.equal(await sample(metrics.faucetIndexerLag), undefined);
+	});
+
+	it("drops a missing field's series and counts it; /chain without a genesis fails", async () => {
+		answers = {
+			...devnetAnswers(),
+			"/limits": {
+				status: 200,
+				body: withField(serviceBody("devnet", "faucet_limits", 200), "faucet.balanceFlop", REMOVE),
+			},
+			"/chain": {
+				status: 200,
+				body: withField(serviceBody("devnet", "faucet_chain", 200), "genesisHash", "0xABC"),
+			},
+		};
+		startProbes("devnet");
+		await recorded(3);
+		const mismatch = (target: string, field: string) =>
+			sample(metrics.schemaMismatch, { target, field });
+		assert.equal(await mismatch("faucet_limits", "faucet.balanceFlop"), 1);
+		assert.equal(await sample(metrics.faucetBalance), undefined);
+		assert.equal(await sample(metrics.faucetMinBalance), 10000000);
+		assert.equal(await sample(metrics.probeSuccess, { target: "faucet_limits" }), 1);
+
+		assert.equal(await mismatch("faucet_chain", "genesisHash"), 1);
+		assert.equal(
+			await sample(metrics.probeTotal, { target: "faucet_chain", result: "invalid_response" }),
+			1,
+		);
+		assert.equal(await sample(metrics.probeSuccess, { target: "faucet_chain" }), 0);
+		assert.equal(await sample(metrics.genesisMatch, { source: "faucet" }), undefined);
+	});
+
+	it("pauses all three probes for a Retry-After on any of them", async () => {
+		answers = {
+			...devnetAnswers(),
+			"/limits": { status: 429, body: "", headers: { "retry-after": "120" } },
+		};
+		startProbes("devnet");
+		await recorded(3);
+		assert.equal(
+			await sample(metrics.probeTotal, { target: "faucet_limits", result: "rate_limited" }),
+			1,
+		);
+
+		answers = devnetAnswers();
+		clock.advance(FAUCET_INTERVAL_MS);
+		await settle();
+		assert.equal(requests.length, 3, "paused at 60 s");
+		clock.advance(120_000 - FAUCET_INTERVAL_MS);
+		await recorded(6);
+		assert.deepEqual([count("/limits"), count("/health"), count("/chain")], [2, 2, 2]);
+	});
+});
+
+describe("read-only source (hard rule 1)", () => {
+	it("contains no faucet claim or other write path", () => {
+		const dir = new URL("../src/", import.meta.url);
+		const files = readdirSync(dir, { encoding: "utf8", recursive: true }).filter((file) =>
+			file.endsWith(".ts"),
+		);
+		assert.ok(files.includes("probes.ts"));
+		for (const file of files) {
+			const text = readFileSync(new URL(file, dir), "utf8");
+			for (const path of [
+				"agent-claims",
+				"/fund",
+				"/sponsor",
+				"faucet/fund",
+				"enroll",
+				"chat/completions",
+			]) {
+				assert.ok(!text.includes(path), `${file} contains ${path}`);
+			}
+		}
 	});
 });

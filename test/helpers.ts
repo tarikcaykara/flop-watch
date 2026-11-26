@@ -1,5 +1,10 @@
-// Shared test helpers: a manual clock for injected timers, a time-bounded wait for socket I/O,
-// and a reader for single metric samples.
+// Shared test helpers: a manual clock for injected timers, a time-bounded wait for socket I/O, a
+// reader for single metric samples, a failed-outcome assertion, and the recorded faucet and
+// explorer bodies.
+
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import type { HttpOutcome } from "../src/http.ts";
 
 export interface ManualClock {
 	readonly now: () => number;
@@ -68,4 +73,47 @@ export async function sample(
 			(metricName === undefined || v.metricName === metricName) &&
 			Object.entries(labels).every(([k, value]) => v.labels[k] === value),
 	)?.value;
+}
+
+interface ServiceFixtures {
+	networks: Record<string, Record<string, Record<string, unknown>>>;
+}
+const services: ServiceFixtures = JSON.parse(
+	readFileSync(new URL("fixtures/services.json", import.meta.url), "utf8"),
+);
+
+/** A recorded body from fixtures/services.json; fails the test when it was not recorded. */
+export function serviceBody(
+	network: "devnet" | "testnet",
+	target: string,
+	status: 200 | 503,
+): unknown {
+	const value = services.networks[network]?.[target]?.[String(status)];
+	assert.ok(value !== undefined, `fixture ${network} ${target} ${status}`);
+	return value;
+}
+
+export const REMOVE = Symbol("remove");
+
+/** A deep copy of `source` with the value at the dotted `path` replaced, or removed. */
+export function withField(source: unknown, path: string, value: unknown): unknown {
+	const copy = structuredClone(source);
+	const keys = path.split(".");
+	const last = keys.pop();
+	let parent: unknown = copy;
+	for (const key of keys) {
+		assert.ok(typeof parent === "object" && parent !== null, `path ${path}`);
+		parent = Reflect.get(parent, key);
+	}
+	assert.ok(typeof parent === "object" && parent !== null && last !== undefined, `path ${path}`);
+	if (value === REMOVE) Reflect.deleteProperty(parent, last);
+	else Reflect.set(parent, last, value);
+	return copy;
+}
+
+/** Asserts that `outcome` is a failure and returns it narrowed. */
+export function failure(outcome: HttpOutcome) {
+	assert.notEqual(outcome.result, "ok");
+	assert.ok("error" in outcome);
+	return outcome;
 }
