@@ -235,8 +235,8 @@ Notes:
 
 ## 7. Derived signals
 
-File: `prometheus/rules/flop-watch.rules.yml`. Everything derived lives **only** in rules. These
-are inferences, and each alert's `category` label says so.
+File: `prometheus/rules/flop-watch.rules.yml`. Everything derived lives **only** in rules. Each
+alert's `category` label says whether the signal it reads is measured, reported or derived.
 
 **Recording rules:**
 

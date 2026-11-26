@@ -25,10 +25,13 @@ in collapsed rows at the bottom.
 | UID, title | `flop-watch-overview`, `FLOP Network health — flop-watch` | A stable link for issues and posts |
 | Variable `network` | `label_values(flopwatch_probe_total, network)`, single-select, no "All", default `testnet` | Networks are never mixed in a panel (architecture §8) |
 | Default time range | Last 24 h | One day shows "since when" for most incidents and keeps the default load small for anonymous viewers |
-| Refresh | 1 min; the shortest choice is 30 s | The probes run every 30–60 s and Prometheus scrapes every 15 s |
-| Timezone | UTC | Issues in flop-labs/network report times in UTC |
+| Refresh | 1 min; the shortest choice is 30 s, enforced by the server setting `[dashboards] min_refresh_interval = 30s` (#14) | The probes run every 30–60 s and Prometheus scrapes every 15 s. The picker alone does not stop a viewer from asking for 5 s |
+| Timezone | UTC | flop-watch's docs, recorded results and logs are all in UTC |
 | Tooltip | Shared crosshair | Compare rows at the same moment |
 | Annotation | `ALERTS{alertname="FlopRuntimeUpgraded", alertstate="firing", network="$network"}`, titled "Runtime upgrade" | Runtime upgrades on every time-series panel (architecture §8) |
+
+**Query load.** A refresh runs the queries of the open rows: 36 panels. The Identity and Collector
+rows are collapsed, and Grafana runs no query for a collapsed row until a viewer opens it.
 
 ## 3. Conventions
 
@@ -41,13 +44,27 @@ in collapsed rows at the bottom.
 - **Missing data.** A value series disappears when its source fails (architecture §5). Panels show
   it as "No data" in grey, never as 0. Time series do not connect points across gaps longer than
   2 min, so an outage stays visible as a gap.
-- **Thresholds** use the same numbers as the alerts of architecture §7. The yellowpaper thresholds
-  (30 and 120 blocks) are named as such in the description; the others are proposed defaults.
+- **Thresholds** use the numbers of the alerts in architecture §7, on the series each alert reads.
+  The yellowpaper thresholds (30 and 120 blocks) are named as such in the description. A few
+  panels add an earlier orange step that no alert uses, such as 10 s on the best head age; these
+  and the alert thresholds outside the yellowpaper are proposed defaults.
 - **Negative values.** Lags are shown raw, with a line at 0. They can go negative on Devnet
   (research.md §10.2) and against the explorer.
 - **Units.** Seconds `s`; blocks `none` with the suffix ` blocks`; FLOP `none` with the suffix
   ` FLOP`; requests per second `reqps`. Block numbers show all digits, without SI prefixes.
-- **Rates** use `$__rate_interval`.
+- **Rates.** Rates use `$__rate_interval`. Latency quantiles use a fixed `[5m]` window, because a
+  probe adds one observation every 30–60 s and a shorter window would leave gaps; the duration
+  buckets (0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10 s) limit their resolution. Bar charts of counts use
+  `increase(…[$__interval])` with a minimum interval of 1 min and no decimals, so one event falls
+  into one bar.
+- **Counters start at 0.** `increase()` misses a counter's first event when the series appears
+  with value 1. The collector therefore creates every bounded counter series at 0 at startup:
+  each target's results, the WebSocket disconnect reasons, connects, skipped blocks, rewinds and
+  each allowlisted schema-mismatch field. That adds about 150 series for two networks, within the
+  limit of architecture §6. This is a collector change, tracked in #35.
+- **Per-series mappings.** When one panel shows series whose values mean different things, such
+  as F3 (status code and stale flag) and F8 (HTTP status and `ready`), each series gets its own
+  value mapping through a field override.
 - **State sets.** `flopwatch_faucet_status` and `flopwatch_faucet_sponsor_status` are turned into
   one code per series by the panel query, and value mappings show the state's name. This only
   encodes the display; it interprets nothing.
@@ -96,7 +113,7 @@ Grafana's grid is 24 columns wide; sizes are width × height in grid units.
   - Content (Markdown): "Independent, read-only monitor of FLOP Network Devnet and Testnet,
     from a single vantage point. Not affiliated with FLOP Labs. **Measured**: observed by
     flop-watch. **Reported**: stated by a FLOP node or service. **Derived**: computed by a rule
-    from other signals. Times are UTC. Source and method:
+    from other signals. **Self**: about flop-watch itself. Times are UTC. Source and method:
     [github.com/tarikcaykara/flop-watch](https://github.com/tarikcaykara/flop-watch)."
 
 ### Now
@@ -107,7 +124,8 @@ Each stat shows the latest value of the selected network.
   - Query: `flopwatch_probe_success{network="$network", target="rpc_ws"}`
   - Display: 1 "Up" green, 0 "Down" red.
   - Description: "Measured · `system_health` over flop-watch's RPC WebSocket, every 30 s. Down
-    means the last health call over the WebSocket failed."
+    means the last attempt failed: the health call, the connection, or the setup after
+    connecting."
 - **N2 RPC HTTP** · stat
   - Query: `flopwatch_probe_success{network="$network", target="rpc_http"}`
   - Display: 1 "Up" green, 0 "Down" red.
@@ -115,7 +133,8 @@ Each stat shows the latest value of the selected network.
     30 s. Down means at least one of the two failed in the last cycle."
 - **N3 Best head age** · stat
   - Query: `flopwatch:best_head_age_seconds{network="$network"}`
-  - Display: s; green below 10, orange from 10, red from 30 (`FlopBestHeadStale`).
+  - Display: s; green below 10, orange from 10 (a proposed default with no alert), red from 30
+    (`FlopBestHeadStale`).
   - Description: "Derived · time since flop-watch received the last new-head notification over
     the WebSocket. Blocks come every second, so over 30 s means no new block reached us."
 - **N4 Finality lag** · stat
@@ -126,9 +145,10 @@ Each stat shows the latest value of the selected network.
 - **N5 Faucet claims** · stat
   - Query: `flopwatch:faucet_claim_ready{network="$network"}`
   - Display: 1 "Ready" green, 0 "Not ready" red.
-  - Description: "Derived · mirrors the official faucet page's check: `/chain` and `/limits`
-    fetched, the faucet's genesis matches, `stale` is false and the status is `open`. Not ready
-    means the claim button would be disabled."
+  - Description: "Derived · mirrors the Testnet faucet page's check (research §7): `/chain` and
+    `/limits` fetched, the faucet's genesis matches, `stale` is false and the status is `open`.
+    Not checked: the network names, which the genesis check covers, and the page's agent-lane
+    constants. The page itself checks only on load, so it can stay disabled after this recovers."
 - **N6 Faucet status** · stat
   - Query: the faucet status code of §3.
   - Display: 1 "open" green, 2 "low_balance" red, 3 "unknown" orange, 4 "other" grey.
@@ -181,27 +201,28 @@ Each stat shows the latest value of the selected network.
     `flopwatch_probe_success{network="$network", target="rpc_http"}` as "HTTP probe".
   - Display: 1 "Up" green, 0 "Down" red.
   - Description: "Measured · flop-watch's WebSocket connection and its 30 s probes over the
-    WebSocket and HTTP. Gaps mean the collector was not running."
+    WebSocket and HTTP. Gaps mean the collector was not running or Prometheus could not scrape
+    it."
 - **R2 RPC latency** · time series, 12×6
   - Queries:
-    `histogram_quantile(0.5, sum by (le, target) (rate(flopwatch_probe_duration_seconds_bucket{network="$network", target=~"rpc_ws|rpc_http"}[$__rate_interval])))`
+    `histogram_quantile(0.5, sum by (le, target) (rate(flopwatch_probe_duration_seconds_bucket{network="$network", target=~"rpc_ws|rpc_http"}[5m])))`
     as `{{target}} p50`, and the same with `0.95` as `{{target}} p95`.
   - Display: s.
   - Description: "Measured · response time of the RPC probes from one vantage point, including
     our network path and the Cloudflare edge. HTTP includes the genesis check every 10 min."
 - **R3 RPC failures** · time series as bars, 8×6
   - Query:
-    `sum by (target, result) (increase(flopwatch_probe_total{network="$network", target=~"rpc_ws|rpc_http", result!="ok"}[$__rate_interval]))`
+    `sum by (target, result) (increase(flopwatch_probe_total{network="$network", target=~"rpc_ws|rpc_http", result!="ok"}[$__interval]))`
     as `{{target}} {{result}}`.
-  - Display: stacked bars.
+  - Display: stacked bars, minimum interval 1 min, no decimals.
   - Description: "Measured · failed RPC requests by result: timeout, network error, HTTP error,
     JSON-RPC error, invalid response or rate limited."
 - **R4 WebSocket reconnects** · time series as bars, 8×6
   - Queries:
-    `sum by (reason) (increase(flopwatch_ws_disconnects_total{network="$network"}[$__rate_interval]))`
+    `sum by (reason) (increase(flopwatch_ws_disconnects_total{network="$network"}[$__interval]))`
     as `disconnect: {{reason}}`;
-    `increase(flopwatch_ws_connects_total{network="$network"}[$__rate_interval])` as `connect`.
-  - Display: stacked bars.
+    `increase(flopwatch_ws_connects_total{network="$network"}[$__interval])` as `connect`.
+  - Display: stacked bars, minimum interval 1 min, no decimals.
   - Description: "Measured · WebSocket connections opened, and closed by reason: a remote close,
     an error, or flop-watch's stall watchdog (no new head for 30 s)."
 - **R5 Node peers and syncing** · time series, 8×6
@@ -225,44 +246,44 @@ Each stat shows the latest value of the selected network.
   - Query: `flopwatch:finality_lag_blocks{network="$network"}`
   - Display: blocks; threshold lines at 30 orange and 120 red; a line at 0.
   - Description: "Derived · best minus finalized block number. 30 and 120 blocks are the
-    yellowpaper's warning and freeze thresholds. Devnet can go negative, because its WebSocket
-    streams come from more than one backend."
+    yellowpaper's warning and freeze thresholds. Devnet can go negative, probably because its
+    WebSocket streams come from more than one backend."
 - **B3 Head age** · time series, 12×7
   - Queries: `flopwatch:best_head_age_seconds{network="$network"}` as "best";
     `flopwatch:finalized_head_age_seconds{network="$network"}` as "finalized".
-  - Display: s; threshold lines at 30 orange (`FlopBestHeadStale`) and 120 red
-    (`FlopFinalityStalled`).
+  - Display: s; a threshold line at 30 orange on "best" (`FlopBestHeadStale`) and at 120 red on
+    "finalized" (`FlopFinalityStalled`).
   - Description: "Derived · time since the last new-head and finalized-head notifications
     reached flop-watch. This reflects delivery to us, not block production."
 - **B4 Block interval** · heatmap, 12×7
   - Query:
-    `sum by (le) (increase(flopwatch_chain_block_interval_seconds_bucket{network="$network"}[$__rate_interval]))`,
-    format heatmap.
+    `sum by (le) (increase(flopwatch_chain_block_interval_seconds_bucket{network="$network"}[$__interval]))`,
+    format heatmap, minimum interval 1 min.
   - Display: y axis in s, from the histogram buckets.
   - Description: "Reported · BABE slot delta times slot duration, between consecutive,
     parent-linked blocks. 1 s is normal; anything higher means empty slots."
 - **B5 Skipped and rewound heads** · time series as bars, 12×7
   - Queries:
-    `increase(flopwatch_ws_head_skipped_blocks_total{network="$network"}[$__rate_interval])` as
+    `increase(flopwatch_ws_head_skipped_blocks_total{network="$network"}[$__interval])` as
     "skipped blocks";
-    `increase(flopwatch_ws_head_rewinds_total{network="$network"}[$__rate_interval])` as
-    "rewinds".
+    `increase(flopwatch_ws_head_rewinds_total{network="$network"}[$__interval])` as "rewinds".
+  - Display: bars, minimum interval 1 min, no decimals.
   - Description: "Measured · blocks the new-head subscription skipped, and notifications at or
-    below the previous height. This is about delivery to us, not about block production."
+    below the previous height. Skips are about delivery to us; rewinds can also come from short
+    forks."
 
 ### Faucet
 
 - **F1 Claims ready** · state timeline, 12×5
   - Query: `flopwatch:faucet_claim_ready{network="$network"}`
   - Display: 1 "Ready" green, 0 "Not ready" red.
-  - Description: "Derived · mirrors the official faucet page's check: `/chain` and `/limits`
-    fetched, the faucet's genesis matches, `stale` is false and the status is `open`. The page's
-    agent-lane constants are not checked."
+  - Description: same text as N5.
 - **F2 Faucet probes** · state timeline, 12×5
   - Query: `flopwatch_probe_success{network="$network", target=~"faucet_.*"}` as `{{target}}`.
   - Display: 1 "Up" green, 0 "Down" red.
   - Description: "Measured · GET `/limits`, `/health` and `/chain` every 60 s. `/health` counts as
-    up on its 503 'degraded' answer too, because that is a valid answer."
+    up on its 503 'degraded' answer too, because that is a valid answer; `/chain` counts as up
+    only with a valid genesis hash."
 - **F3 Status** · state timeline, 12×5
   - Queries: the faucet status code of §3 as "status";
     `flopwatch_faucet_stale{network="$network"}` as "stale".
@@ -315,7 +336,7 @@ Each stat shows the latest value of the selected network.
     5 min."
 - **F12 Response time** · time series, 8×6
   - Query:
-    `histogram_quantile(0.95, sum by (le, target) (rate(flopwatch_probe_duration_seconds_bucket{network="$network", target=~"faucet_.*"}[$__rate_interval])))`
+    `histogram_quantile(0.95, sum by (le, target) (rate(flopwatch_probe_duration_seconds_bucket{network="$network", target=~"faucet_.*"}[5m])))`
     as `{{target}} p95`.
   - Display: s.
   - Description: "Measured · p95 response time of the faucet probes from one vantage point."
@@ -331,7 +352,8 @@ Each stat shows the latest value of the selected network.
   - Query: `flopwatch:explorer_indexer_lag_blocks{network="$network"}`
   - Display: blocks; threshold line at 120 orange; a line at 0.
   - Description: "Derived · our best block minus the explorer's latest indexed block. It can be
-    slightly negative when the explorer's node is ahead of the WebSocket backend we hear from."
+    slightly negative, because the two sources are read at different moments and may come from
+    different nodes."
 - **E3 Finality view (explorer)** · time series, 8×6
   - Queries: `flopwatch_explorer_finalized_lag_blocks{network="$network"}` as "finalized lag";
     `flopwatch_explorer_safe_mode{network="$network"}` as "safe mode", as bars on the right axis
@@ -365,13 +387,15 @@ Each stat shows the latest value of the selected network.
 ### Collector (collapsed)
 
 - **C1 Version** · stat, 6×4
-  - Query: `flopwatch_build_info`, display name `${__field.labels.version}`.
+  - Query: `flopwatch_build_info`; text mode "Name", display name `${__field.labels.version}`.
   - Description: "Self · the running flop-watch version."
 - **C2 Requests to FLOP** · time series, 9×6
   - Query: `sum(rate(flopwatch_probe_total{network="$network"}[10m]))`
-  - Display: reqps; threshold line at 0.25 red.
+  - Display: reqps; threshold line at 0.25 red. The window is a fixed 10 min, so the 10-min
+    genesis check is always inside it.
   - Description: "Self · flop-watch's steady-state requests to this network's endpoints, against
-    the 0.25 requests/s budget. Reconnect identity calls are not counted."
+    the 0.25 requests/s budget: every probe request, including the WebSocket health pings.
+    Reconnect identity calls and subscriptions are not counted."
 - **C3 Memory** · time series, 9×6
   - Query: `process_resident_memory_bytes{job="flop-watch"}`
   - Display: bytes; threshold line at 150 MB orange.
@@ -379,7 +403,7 @@ Each stat shows the latest value of the selected network.
 - **C4 Schema mismatches** · table, 24×6
   - Query (instant):
     `sum by (target, field) (increase(flopwatch_schema_mismatch_total{network="$network"}[$__range])) > 0`
-  - Display: columns `target`, `field` and the count.
+  - Display: columns `target`, `field` and the count, no decimals.
   - Description: "Self · remote fields that were missing or had an unexpected type in the selected
     time range. A FLOP service probably changed its JSON."
 
@@ -415,6 +439,9 @@ Every metric family of architecture §6 appears in a panel, directly or through 
   `flopwatch:finality_lag_blocks`, `flopwatch:best_head_age_seconds`,
   `flopwatch:finalized_head_age_seconds`, `flopwatch:faucet_limits_age_seconds`,
   `flopwatch:faucet_claim_ready` and `flopwatch:explorer_indexer_lag_blocks`.
+- **Prometheus's own series.** Besides the collector's metrics and these rules, I1, I2 and the
+  annotation read `ALERTS`, and C3 and `FlopWatchDown` select the scrape job by
+  `job="flop-watch"`. The scrape config (#13) must name the job `flop-watch`.
 - **`category` is an alert label.** I1 and I2 read alerts from the `ALERTS` series, which carries
   an alert's labels but not its annotations. Each alert therefore has a `category` label next to
   `severity`; its values are `measured`, `reported` and `derived`.
@@ -433,9 +460,10 @@ Each choice below is already applied in this spec; the owner confirms or changes
 | # | Decision | Recommendation | Alternative |
 |---|---|---|---|
 | 1 | Row order | Now and Incidents first, then RPC, Blocks, Faucet, Explorer; Identity and Collector collapsed at the bottom | Architecture §8's original order: Identity first, Incidents last |
-| 2 | About panel | A slim text panel at the top: what this is, not affiliated, the three categories | No text; categories only in descriptions |
-| 3 | Defaults | Last 24 h, refresh 1 min, UTC | Last 6 h; browser timezone |
+| 2 | About panel | A slim text panel at the top: what this is, not affiliated, the categories | No text; categories only in descriptions |
+| 3 | Defaults | Last 24 h, refresh 1 min with a 30 s server minimum, UTC | Last 6 h; browser timezone |
 | 4 | Explorer alert | Split into `FlopExplorerDown` and `FlopExplorerIndexerLagging` (§7) | One alert, as in architecture §7 today |
 | 5 | `category` | A label on every alert (§7) | An annotation, which Grafana cannot show from `ALERTS` |
 | 6 | `/health` `ready` | Neutral blue and grey, labelled "this client"; no alert | Green and red like the other flags |
 | 7 | Missing data | "No data" in grey, gaps over 2 min left open | Show 0, or connect across gaps |
+| 8 | Panel-only thresholds | An orange step at 10 s on the best head age (N3), with no alert behind it | Only the alert thresholds |

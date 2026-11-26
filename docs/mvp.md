@@ -89,7 +89,8 @@ Each criterion is testable:
    The process does not crash, and the other network's metrics are unaffected.
 4. A fixture `/limits` with `faucet.status: "unknown"` gives `flopwatch:faucet_claim_ready` = 0.
 5. Steady-state outbound requests are ≤ 0.25/s per network. This is measured as
-   `sum by (network) (rate(flopwatch_probe_total[10m]))` plus the WS health pings.
+   `sum by (network) (rate(flopwatch_probe_total[10m]))`, which counts every probe request,
+   including the WS health pings.
 6. `count({__name__=~"flopwatch_.*"})` < 1000.
 7. Collector RSS < 150 MB after 24 h.
 8. A unit test proves that the RPC method allowlist rejects `author_submitExtrinsic`.
