@@ -1,8 +1,9 @@
 # flop-watch — dashboard spec
 
-Status: proposal, pending owner approval (#33). This is the panel spec of the `flop-watch-overview`
-dashboard of [architecture.md](architecture.md) §8. #14 builds the dashboard from it, and #13
-builds the rules it reads (architecture §7).
+Status: approved (#33, #34), implemented in `grafana/dashboard.ts` (#14). This is the panel spec of
+the `flop-watch-overview` dashboard of [architecture.md](architecture.md) §8, and the rules it
+reads are in architecture §7. A change to a panel updates this file, the generator and the JSON
+(`pnpm dashboard`) in the same PR.
 
 ## 1. Purpose
 

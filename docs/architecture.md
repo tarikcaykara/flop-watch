@@ -327,8 +327,10 @@ rules and evaluates them without errors.
 
 ## 8. Grafana
 
-- **Provisioning.** A Prometheus datasource and one dashboard, `flop-watch-overview`, both
-  provisioned from files.
+- **Provisioning.** A Prometheus datasource (uid `prometheus`) and one dashboard,
+  `flop-watch-overview`, both provisioned read-only from `grafana/`. The dashboard is also the home
+  page. It is not editable in Grafana: `grafana/dashboard.ts` generates its JSON (`pnpm dashboard`),
+  and a test keeps the committed file equal to that output.
 - **Panel spec.** [dashboard.md](dashboard.md) specifies every panel: its question, query,
   display, category and description text, plus the dashboard settings.
 - **Network variable.** The `network` variable is single-select, with `testnet` as the default.
@@ -409,8 +411,7 @@ rules and evaluates them without errors.
     is not published.
   - `grafana`: published **only** on `127.0.0.1`, port `GRAFANA_PORT` (default 3000). The admin
     password comes from `GRAFANA_ADMIN_PASSWORD` in `.env`, and only when the Grafana database is
-    first created. Usage reporting, update checks and plugin preinstalls are off; #14 sets the rest
-    of §11 and provisions the datasource and dashboard.
+    first created. §11 lists its other settings.
   - Prometheus and Grafana images are pinned to exact versions; Prometheus and Grafana have
     healthchecks, so `docker compose up --wait` returns once the stack is ready.
 - **Volumes.** Named volumes for Prometheus and Grafana data.
@@ -442,12 +443,15 @@ rules and evaluates them without errors.
   - the subscribe/unsubscribe pairs for new heads, finalized heads and the runtime version.
 
   A unit test asserts that `author_submitExtrinsic` is rejected.
-- **Grafana.**
-  - Anonymous access: `GF_AUTH_ANONYMOUS_ENABLED=true`, `GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer`.
+- **Grafana** (checked against 13.3.2 by the stack e2e):
+  - Anonymous access: `GF_AUTH_ANONYMOUS_ENABLED=true`, `GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer`, and
+    the version hidden from anonymous visitors.
   - No sign-up or viewer edits: `GF_USERS_ALLOW_SIGN_UP=false`, `GF_USERS_VIEWERS_CAN_EDIT=false`.
+    The e2e checks that an anonymous visitor can read the dashboard but cannot save it.
   - External snapshots off: `GF_SNAPSHOTS_EXTERNAL_ENABLED=false`.
-  - Analytics and update checks off.
-  - The exact settings are confirmed against the pinned version at M3.
+  - A 30 s minimum refresh: `GF_DASHBOARDS_MIN_REFRESH_INTERVAL=30s`.
+  - Nothing sent to grafana.com or gravatar.com: usage reporting, update checks, plugin
+    preinstalls, the news feed and Gravatar are off.
 - **Residual risk.** Anonymous viewers can send arbitrary PromQL through Grafana's datasource query
   API. This is accepted: all the data is public, and the Prometheus query limits (§10) bound the
   cost.

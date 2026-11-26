@@ -132,7 +132,8 @@ describe("compose.yaml", () => {
 		const mounts = (services["grafana"]?.volumes ?? []).filter((v) => v.read_only);
 		assert.deepEqual(mounts.map((v) => v.target).toSorted(), [
 			"/etc/grafana/dashboards",
-			"/etc/grafana/provisioning",
+			"/etc/grafana/provisioning/dashboards",
+			"/etc/grafana/provisioning/datasources",
 		]);
 	});
 });
@@ -258,10 +259,12 @@ describe("the stack", { timeout: 600_000 }, () => {
 		});
 		assert.ok([401, 403].includes(save.status), `saving answered ${save.status}`);
 
-		const home: { dashboard: { uid?: string } } = JSON.parse(
+		// Grafana 13 answers the home page with a redirect to the dashboard it loaded from
+		// default_home_dashboard_path; the slug comes from that dashboard's title.
+		const home: { redirectUri?: string } = JSON.parse(
 			await (await grafana("/api/dashboards/home")).text(),
 		);
-		assert.equal(home.dashboard.uid, "flop-watch-overview");
+		assert.match(home.redirectUri ?? "", /^\/d\/[^/]+\/flop-network-health-/);
 	});
 
 	it("runs every panel query without errors, as an anonymous visitor", async () => {

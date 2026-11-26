@@ -72,6 +72,7 @@ pnpm audit:deps   # pnpm audit --audit-level=moderate, from #24
 node src/main.ts  # collector, from #4
 pnpm test:e2e     # the Compose stack e2e; needs Docker, from #12
 pnpm test:rules   # promtool check and test of prometheus/; needs Docker, from #13
+pnpm dashboard    # regenerate grafana/dashboards/ from grafana/dashboard.ts, from #14
 ```
 
 The gate is `pnpm check && pnpm typecheck && pnpm test && pnpm audit:deps`. Run it before every
