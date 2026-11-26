@@ -11,7 +11,7 @@ continuously, from the outside:
 - faucet capacity and readiness;
 - the explorer's indexer state.
 
-It keeps the history in Prometheus and shows it in Grafana. Every signal is labelled as
+It keeps the history in Prometheus and shows it in Grafana. Every signal about FLOP is labelled as
 **measured** (by flop-watch), **reported** (by a FLOP service) or **derived** (by a rule).
 
 > **Status: pre-alpha.** The collector, the Prometheus rules and the Grafana dashboard run as one
@@ -33,23 +33,30 @@ cp .env.example .env            # then set GRAFANA_ADMIN_PASSWORD in .env
 docker compose up -d --wait     # returns once all three services are healthy
 ```
 
+`.env.example` ships the placeholder `change-me` as the password: replace it before the first
+start.
+
 Open <http://127.0.0.1:3000>. The dashboard, "FLOP Network health — flop-watch", is the home page.
 It opens without a login and is read-only. Pick the network at the top; Testnet is the default.
 
 The first values show within about a minute. The history starts when you start the stack:
 flop-watch has nothing from before.
 
-To change the dashboard or Grafana's settings, sign in as `admin` with the password from `.env`.
+To manage Grafana itself (users, settings), sign in as `admin` with the password from `.env`.
 Grafana reads that password only when it creates its database, on the first start. After that,
-change it in Grafana.
+change it in Grafana. The dashboard stays read-only even for `admin`: it is generated from
+`grafana/dashboard.ts` (`pnpm dashboard`).
 
 ### Stopping, updating and removing
 
 ```bash
 docker compose down                       # stop; the history stays in Docker volumes
-git pull && docker compose up -d --build --wait   # update to the latest version
+git pull && docker compose up -d --build --force-recreate --wait   # update
 docker compose down --volumes             # stop and delete the history and Grafana's database
 ```
+
+An update recreates every container, so Prometheus loads the new rules and Grafana the new
+provisioning; Prometheus does not reload its rules on its own. The history survives it.
 
 Prometheus keeps 180 days of history.
 
@@ -79,14 +86,15 @@ After a change, run `docker compose up -d` again.
 | `FLOPWATCH_<NET>_FAUCET_URL` | the network's public faucet | Faucet base URL; empty turns the faucet probes off |
 | `FLOPWATCH_<NET>_EXPLORER_API_URL` | the network's explorer API | Explorer API base URL; empty turns the explorer probe off |
 | `FLOPWATCH_<NET>_EXPECTED_GENESIS` | the network's genesis hash | The genesis hash every source is checked against |
-| `FLOPWATCH_HOST` | `0.0.0.0` | The collector's listen address |
+| `FLOPWATCH_HOST` | `0.0.0.0` | The collector's listen address; keep `0.0.0.0` in Docker, so Prometheus reaches it |
 | `FLOPWATCH_PORT` | `10063` | The collector's metrics port |
 | `FLOPWATCH_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
 
 `<NET>` is `DEVNET` or `TESTNET`. The defaults are in `.env.example`.
 
 - **Your own node.** Point `FLOPWATCH_<NET>_RPC_WS` and `_RPC_HTTP` at it, for example
-  `ws://my-node:9944` and `http://my-node:9944`.
+  `ws://my-node:9944` and `http://my-node:9944`. The collector runs in a container, so
+  `localhost` there is the container itself, not your machine.
 - **One network.** `FLOPWATCH_NETWORKS=testnet`.
 - **Empty values.** An empty value means "use the default", except for the faucet and explorer
   URLs, where it turns that probe off.
@@ -143,7 +151,8 @@ The incidents, with their thresholds:
 | `FlopExplorerIndexerLagging` | The explorer is over 120 blocks behind the chain, for 5 min |
 | `FlopWatchDown` | Prometheus has not reached the collector for 2 min |
 
-30 and 120 blocks are the FLOP yellowpaper's finality thresholds. The other thresholds and
+The rules file, `prometheus/rules/flop-watch.rules.yml`, is the source of these conditions. 30 and
+120 blocks are the FLOP yellowpaper's finality thresholds. The other thresholds and
 durations are proposed defaults. The [dashboard spec](docs/dashboard.md) describes every panel,
 and [architecture §6–§7](docs/architecture.md#6-prometheus-metric-design) every metric and rule.
 
@@ -188,7 +197,7 @@ Its own limit is 0.25 per second.
 ## Troubleshooting
 
 `docker compose ps` shows each service's health, and `docker compose logs flop-watch` shows the
-collector's log as JSON lines.
+collector's log: JSON lines, except a configuration error, which is plain text.
 
 - **`set GRAFANA_ADMIN_PASSWORD in .env`.** `docker compose up` needs `.env` with a password:
   `cp .env.example .env`, then set it.
@@ -207,8 +216,8 @@ collector's log as JSON lines.
   another chain. If the [FLOP docs](https://docs.flop.network/networks/testnet) confirm a reset,
   set `FLOPWATCH_TESTNET_EXPECTED_GENESIS` to the new hash, and please open an issue so the
   default can follow.
-- **Explorer down on Testnet with a 503.** The explorer answers `Era-T reader unavailable` while
-  its indexer is down; that is FLOP's side.
+- **Explorer down on Testnet with a 503 `Era-T reader unavailable`.** The explorer itself answers
+  this; it was seen while FLOP's indexer was unavailable.
 
 ## Documents
 
