@@ -17,7 +17,14 @@ import {
 	SPONSOR_STATUSES,
 	type Target,
 } from "./metrics.ts";
-import { parseFaucetChain, parseFaucetHealth, parseFaucetLimits } from "./parse.ts";
+import {
+	type ChainField,
+	type HealthField,
+	type LimitsField,
+	parseFaucetChain,
+	parseFaucetHealth,
+	parseFaucetLimits,
+} from "./parse.ts";
 import { rpcCall } from "./rpc-http.ts";
 
 export const FIRST_RUN_JITTER_MS = 5_000;
@@ -86,7 +93,8 @@ export function startLoop(
 
 /**
  * One Retry-After pause for the loops that hit the same host. While it lasts, a wrapped run sends
- * nothing and returns the remaining wait; a run that returns a Retry-After starts it.
+ * nothing and returns the remaining wait; a run that returns a Retry-After extends it, never
+ * shortens it.
  */
 function sharedPause(now: () => number) {
 	let pausedUntil = 0;
@@ -94,7 +102,9 @@ function sharedPause(now: () => number) {
 		const wait = pausedUntil - now();
 		if (wait > 0) return wait;
 		const retry = await run();
-		if (retry !== null) pausedUntil = now() + Math.min(retry, RETRY_AFTER_CAP_MS);
+		if (retry !== null) {
+			pausedUntil = Math.max(pausedUntil, now() + Math.min(retry, RETRY_AFTER_CAP_MS));
+		}
 		return retry;
 	};
 }
@@ -240,8 +250,7 @@ export function startHttpRpcProbes(
 }
 
 /** Faucet /health answers 503 with its usual JSON body when degraded (architecture §6). */
-const isHealthAnswer = (status: number) =>
-	(status >= 200 && status < 300) || (status >= 500 && status < 600);
+const isHealthAnswer = (status: number) => (status >= 200 && status < 300) || status === 503;
 
 /**
  * The faucet probes of one network (architecture §4, §6): GET /limits, /health and /chain, each in
@@ -258,7 +267,11 @@ export function startFaucetProbes(
 	let stopped = false;
 
 	/** Records one request of `target`, with the allowlisted fields its body lacked. */
-	const record = (target: Target, outcome: HttpOutcome, mismatches: readonly string[]) => {
+	const record = (
+		target: Target,
+		outcome: HttpOutcome,
+		mismatches: readonly (LimitsField | HealthField | ChainField)[],
+	) => {
 		const labels = { ...byNetwork, target };
 		metrics.probeTotal.inc({ ...labels, result: outcome.result });
 		metrics.probeDuration.observe(labels, outcome.ms / 1000);

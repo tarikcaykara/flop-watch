@@ -578,7 +578,7 @@ describe("startFaucetProbes", () => {
 		answers = {
 			...answers,
 			"/limits": { status: 502, body: "<html>bad gateway</html>" },
-			"/health": { status: 404, body: { error: "not found" } },
+			"/health": { status: 502, body: { error: "bad gateway" } },
 		};
 		clock.advance(FAUCET_INTERVAL_MS);
 		await recorded(6);
@@ -597,21 +597,24 @@ describe("startFaucetProbes", () => {
 		assert.equal(
 			await sample(metrics.probeTotal, { target: "faucet_health", result: "http_error" }),
 			1,
-			"a 404 is no /health answer",
+			"a JSON 502 is no /health answer",
 		);
-		assert.equal(await sample(metrics.faucetHealthStatusCode), 404, "measured on failures too");
+		assert.equal(await sample(metrics.faucetHealthStatusCode), 502, "measured on failures too");
 		assert.equal(await sample(metrics.faucetHealthReady), undefined);
 		assert.equal(await sample(metrics.faucetDependencyOk), undefined);
 		assert.equal(await sample(metrics.faucetIndexerLag), undefined);
 	});
 
 	it("drops a missing field's series and counts it; /chain without a genesis fails", async () => {
+		let limits = withField(
+			serviceBody("devnet", "faucet_limits", 200),
+			"faucet.balanceFlop",
+			REMOVE,
+		);
+		limits = withField(limits, "sponsor.validator.status", 5);
 		answers = {
 			...devnetAnswers(),
-			"/limits": {
-				status: 200,
-				body: withField(serviceBody("devnet", "faucet_limits", 200), "faucet.balanceFlop", REMOVE),
-			},
+			"/limits": { status: 200, body: limits },
 			"/chain": {
 				status: 200,
 				body: withField(serviceBody("devnet", "faucet_chain", 200), "genesisHash", "0xABC"),
@@ -625,6 +628,13 @@ describe("startFaucetProbes", () => {
 		assert.equal(await sample(metrics.faucetBalance), undefined);
 		assert.equal(await sample(metrics.faucetMinBalance), 10000000);
 		assert.equal(await sample(metrics.probeSuccess, { target: "faucet_limits" }), 1);
+		assert.equal(await mismatch("faucet_limits", "sponsor.validator.status"), 1);
+		assert.equal(await sample(metrics.faucetSponsorStatus, { lane: "validator" }), undefined);
+		assert.equal(
+			await sample(metrics.faucetSponsorStatus, { lane: "miner", status: "positions_full" }),
+			1,
+			"the other lane stays",
+		);
 
 		assert.equal(await mismatch("faucet_chain", "genesisHash"), 1);
 		assert.equal(
@@ -658,14 +668,14 @@ describe("startFaucetProbes", () => {
 });
 
 describe("read-only source (hard rule 1)", () => {
+	const dir = new URL("../src/", import.meta.url);
+	const sources = readdirSync(dir, { encoding: "utf8", recursive: true })
+		.filter((file) => file.endsWith(".ts"))
+		.map((file) => [file, readFileSync(new URL(file, dir), "utf8")] as const);
+
 	it("contains no faucet claim or other write path", () => {
-		const dir = new URL("../src/", import.meta.url);
-		const files = readdirSync(dir, { encoding: "utf8", recursive: true }).filter((file) =>
-			file.endsWith(".ts"),
-		);
-		assert.ok(files.includes("probes.ts"));
-		for (const file of files) {
-			const text = readFileSync(new URL(file, dir), "utf8");
+		assert.ok(sources.some(([file]) => file === "probes.ts"));
+		for (const [file, text] of sources) {
 			for (const path of [
 				"agent-claims",
 				"/fund",
@@ -675,6 +685,17 @@ describe("read-only source (hard rule 1)", () => {
 				"chat/completions",
 			]) {
 				assert.ok(!text.includes(path), `${file} contains ${path}`);
+			}
+		}
+	});
+
+	it("sends POST only from the JSON-RPC client, and never PUT, PATCH or DELETE", () => {
+		for (const [file, text] of sources) {
+			for (const method of ["PUT", "PATCH", "DELETE"]) {
+				assert.ok(!text.includes(`"${method}"`), `${file} sends ${method}`);
+			}
+			if (file !== "http.ts" && file !== "rpc-http.ts") {
+				assert.ok(!text.includes('"POST"'), `${file} sends POST`);
 			}
 		}
 	});

@@ -129,8 +129,10 @@ In the PoC every interval was exactly 1 s, so the histogram mainly shows when sl
 - **Rate limiting.** A 429 is recorded as `result="rate_limited"`. If a failed request (a 429 or an
   error status) carries `Retry-After`, that probe's next run is **delayed** until Retry-After has
   passed, capped at 10 min. Probes that share an endpoint share the pause: the RPC HTTP head/health
-  and genesis loops, and the three faucet loops. A cycle sends no further request once it has been
-  told to wait.
+  and genesis loops, and the three faucet loops. A later, shorter Retry-After never shortens it. A
+  cycle sends no further request once it has been told to wait. A paused probe sends nothing and
+  keeps its last values; for the faucet, the `asOf` age rule (`FlopFaucetLimitsStale`) shows how
+  old they are.
   - **(PoC-driven)** A 503 is **not** recorded as `rate_limited`. The Testnet faucet `/health`
     returns 503 with `Retry-After: 60` as its normal "degraded" answer, which is a valid
     measurement (see the success rules in §6), so its Retry-After pauses nothing.
@@ -211,8 +213,8 @@ Notes:
   collector, only in rules (§7). Inside a group, single metrics can differ: for example,
   `flopwatch_faucet_health_http_status_code` is measured.
 - **Probe success.**
-  - Faucet `/health` succeeds when a JSON object comes back with a 2xx or 5xx status: it answers
-    503 when degraded. A 3xx, a 429 or any other 4xx is a failure.
+  - Faucet `/health` succeeds when a JSON object comes back with a 2xx or 503 status: it answers
+    503 when degraded. Any other status, a JSON 502 from a proxy included, is a failure.
     `flopwatch_faucet_health_http_status_code` is set on every response, failures included.
   - Faucet `/chain` also needs a valid `genesisHash`. Without one the probe is `invalid_response`,
     as the official UI's check fails too; the mismatch is counted and `genesis_match` keeps its
