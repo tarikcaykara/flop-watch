@@ -85,6 +85,29 @@ the Dockerfile, `compose.yaml`, `prometheus/` or `grafana/`; CI runs it from #38
   pass → green CI → squash merge, with the PR title as the commit subject. One issue = one PR.
 - **Order.** Work follows the issues' "Depends on" order within the current milestone. The owner
   can reorder at any time.
+- **Tests first.** Every issue that changes behaviour starts with its tests:
+  1. Write the tests from the issue's acceptance and run them. They must fail on their
+     assertions, because the behaviour or a deliverable file is missing (a series is absent;
+     `.env.example` does not exist). A load error of code (an import of a missing module or
+     export) or a type error does not count: for new code, the test commit adds the smallest
+     stub that compiles, and expected lists are literals in the test.
+  2. Commit them alone as `test(<scope>): …`; the message says what fails and why, and the squash
+     body keeps it on `main`.
+  3. Implement in a separate commit until they pass; refactor with them green.
+  4. A test added later, for example after the review, says so in the PR body.
+
+  Push once, after the implementation: the test commit alone is red by design, and the gate runs
+  on the branch tip. Docs-only, CI-only, dependency-bump and behaviour-preserving changes have
+  nothing to fail and skip this; their PR body says "Not applicable". Otherwise the PR body's
+  **Tests first** section names the test commit and the failure it showed before the change.
+  PRs #36 and #39 are the reference examples.
+- **Test layers.** Pick the lowest layer that proves the acceptance:
+  - unit and integration (`pnpm test`, offline; `test/*.test.ts`): parsers, decoders, config,
+    probes and the chain watcher against local fake servers, and a process test of the real
+    collector;
+  - rules (`promtool test rules`; location set by #13): recording rules and alerts;
+  - stack e2e (`pnpm test:e2e`, Docker; `test/e2e/*.e2e.ts`): the Compose stack, Prometheus and
+    Grafana, with no FLOP host contacted.
 - **Reviewer-agent pass.** Before a PR is merged or handed to the owner, an agent that did not
   write the change reviews its diff. Fix or answer every finding, and summarise the review in the
   PR body.
