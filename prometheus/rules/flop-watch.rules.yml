@@ -1,0 +1,125 @@
+# flop-watch's derived signals (architecture §7). Everything derived lives here and only here.
+# Each alert's `category` label names the kind of signal it reads: measured, reported or derived.
+# Thresholds: 30 and 120 blocks are the yellowpaper's FinalityLagWarn and FinalityFreezeThreshold;
+# every other threshold and every `for` is a proposed default. Tests: prometheus/tests/.
+groups:
+  - name: flop-watch
+    rules:
+      # Recording rules. Lags are kept raw: they can go negative on Devnet.
+      - record: flopwatch:finality_lag_blocks
+        expr: flopwatch_chain_best_block_number - flopwatch_chain_finalized_block_number
+      - record: flopwatch:best_head_age_seconds
+        expr: time() - flopwatch_chain_best_head_received_timestamp_seconds
+      - record: flopwatch:finalized_head_age_seconds
+        expr: time() - flopwatch_chain_finalized_head_received_timestamp_seconds
+      - record: flopwatch:faucet_limits_age_seconds
+        expr: time() - flopwatch_faucet_limits_as_of_timestamp_seconds
+      # Mirrors the official Testnet faucet page's check (research §7). Value series disappear on
+      # failure, so the `or` branch turns an empty `and` chain into an explicit 0.
+      - record: flopwatch:faucet_claim_ready
+        expr: |
+          max by (network) (
+              (flopwatch_faucet_status{status="open"} == 1)
+            and on (network) (flopwatch_faucet_stale == 0)
+            and on (network) (flopwatch_genesis_match{source="faucet"} == 1)
+            and on (network) (flopwatch_probe_success{target="faucet_limits"} == 1)
+            and on (network) (flopwatch_probe_success{target="faucet_chain"} == 1)
+          )
+          or on (network)
+          max by (network) (flopwatch_probe_success{target="faucet_limits"}) * 0
+      - record: flopwatch:explorer_indexer_lag_blocks
+        expr: flopwatch_chain_best_block_number - flopwatch_explorer_latest_block_number
+
+      # Alerts.
+      - alert: FlopRpcWsDown
+        expr: flopwatch_probe_success{target="rpc_ws"} == 0
+        for: 2m
+        labels: { severity: critical, category: measured }
+        annotations:
+          summary: RPC WebSocket probe failing on {{ $labels.network }}
+      - alert: FlopRpcHttpDown
+        expr: flopwatch_probe_success{target="rpc_http"} == 0
+        for: 2m
+        labels: { severity: critical, category: measured }
+        annotations:
+          summary: RPC HTTP probe failing on {{ $labels.network }}
+      - alert: FlopGenesisMismatch
+        expr: flopwatch_genesis_match == 0
+        labels: { severity: critical, category: reported }
+        annotations:
+          summary: >-
+            Genesis hash from {{ $labels.source }} differs from the pinned one on
+            {{ $labels.network }}
+      - alert: FlopBestHeadStale
+        expr: flopwatch:best_head_age_seconds > 30
+        for: 1m
+        labels: { severity: warning, category: derived }
+        annotations:
+          summary: >-
+            No new head over the RPC WebSocket for over 30 s on {{ $labels.network }} (proposed
+            default)
+      - alert: FlopFinalityLagging
+        expr: flopwatch:finality_lag_blocks > 30
+        for: 2m
+        labels: { severity: warning, category: derived }
+        annotations:
+          summary: Finality lag over 30 blocks on {{ $labels.network }} (yellowpaper FinalityLagWarn)
+      - alert: FlopFinalityStalled
+        expr: flopwatch:finality_lag_blocks > 120 or flopwatch:finalized_head_age_seconds > 120
+        for: 1m
+        labels: { severity: critical, category: derived }
+        annotations:
+          summary: >-
+            Finality stalled on {{ $labels.network }}: lag over 120 blocks (yellowpaper
+            FinalityFreezeThreshold) or no finalized head for over 120 s (proposed default)
+      - alert: FlopRuntimeUpgraded
+        expr: changes(flopwatch_runtime_spec_version[15m]) > 0
+        labels: { severity: info, category: reported }
+        annotations:
+          summary: Runtime spec version changed on {{ $labels.network }}
+      - alert: FlopFaucetUnreachable
+        expr: flopwatch_probe_success{target="faucet_limits"} == 0
+        for: 5m
+        labels: { severity: warning, category: measured }
+        annotations:
+          summary: Faucet /limits failing on {{ $labels.network }}
+      - alert: FlopFaucetClaimsNotReady
+        expr: flopwatch:faucet_claim_ready == 0
+        for: 5m
+        labels: { severity: warning, category: derived }
+        annotations:
+          summary: >-
+            Faucet claims not ready on {{ $labels.network }}, as the official Testnet page checks
+            them
+      - alert: FlopFaucetLowBalance
+        expr: flopwatch_faucet_status{status="low_balance"} == 1
+        for: 5m
+        labels: { severity: warning, category: reported }
+        annotations:
+          summary: Faucet reports low_balance on {{ $labels.network }}
+      - alert: FlopFaucetLimitsStale
+        expr: flopwatch:faucet_limits_age_seconds > 300
+        for: 5m
+        labels: { severity: warning, category: derived }
+        annotations:
+          summary: >-
+            Faucet /limits data older than 5 min on {{ $labels.network }} (proposed default)
+      - alert: FlopExplorerDown
+        expr: flopwatch_probe_success{target="explorer_stats"} == 0
+        for: 5m
+        labels: { severity: warning, category: measured }
+        annotations:
+          summary: Explorer /api/stats failing on {{ $labels.network }}
+      - alert: FlopExplorerIndexerLagging
+        expr: flopwatch:explorer_indexer_lag_blocks > 120
+        for: 5m
+        labels: { severity: warning, category: derived }
+        annotations:
+          summary: >-
+            Explorer indexer over 120 blocks behind on {{ $labels.network }} (proposed default)
+      - alert: FlopWatchDown
+        expr: up{job="flop-watch"} == 0
+        for: 2m
+        labels: { severity: critical, category: measured }
+        annotations:
+          summary: Prometheus cannot scrape flop-watch at {{ $labels.instance }}

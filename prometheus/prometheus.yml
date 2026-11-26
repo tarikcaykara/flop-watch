@@ -1,7 +1,10 @@
-# Prometheus for flop-watch (architecture §7, §10). The rule files arrive with #13.
+# Prometheus for flop-watch (architecture §7, §10).
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+
+rule_files:
+  - rules/*.yml
 
 scrape_configs:
   # The panels and FlopWatchDown select this job by name (dashboard.md §7).

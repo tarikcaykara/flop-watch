@@ -71,11 +71,13 @@ pnpm test         # node --test
 pnpm audit:deps   # pnpm audit --audit-level=moderate, from #24
 node src/main.ts  # collector, from #4
 pnpm test:e2e     # the Compose stack e2e; needs Docker, from #12
+pnpm test:rules   # promtool check and test of prometheus/; needs Docker, from #13
 ```
 
 The gate is `pnpm check && pnpm typecheck && pnpm test && pnpm audit:deps`. Run it before every
-push; CI runs the same, with the audit last. Run `pnpm test:e2e` too before pushing a change to
-the Dockerfile, `compose.yaml`, `prometheus/` or `grafana/`; CI runs it from #38.
+push; CI runs the same, with the audit last. Run `pnpm test:rules` and `pnpm test:e2e` too before
+pushing a change to the Dockerfile, `compose.yaml`, `prometheus/` or `grafana/`; CI runs them from
+#15 and #38.
 
 ## Workflow
 
@@ -105,7 +107,7 @@ the Dockerfile, `compose.yaml`, `prometheus/` or `grafana/`; CI runs it from #38
   - unit and integration (`pnpm test`, offline; `test/*.test.ts`): parsers, decoders, config,
     probes and the chain watcher against local fake servers, and a process test of the real
     collector;
-  - rules (`promtool test rules`; location set by #13): recording rules and alerts;
+  - rules (`pnpm test:rules`; `prometheus/tests/*.yml`): recording rules and alerts;
   - stack e2e (`pnpm test:e2e`, Docker; `test/e2e/*.e2e.ts`): the Compose stack, Prometheus and
     Grafana, with no FLOP host contacted.
 - **Reviewer-agent pass.** Before a PR is merged or handed to the owner, an agent that did not

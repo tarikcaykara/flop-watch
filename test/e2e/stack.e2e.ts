@@ -155,6 +155,31 @@ describe("the stack", { timeout: 600_000 }, () => {
 		);
 	});
 
+	it("has Prometheus load the flop-watch rules and evaluate them without errors", async () => {
+		let rules: Array<{ name: string; health: string }> = [];
+		await poll(
+			async () => {
+				const json = await compose([
+					"exec",
+					"-T",
+					"prometheus",
+					"wget",
+					"-qO-",
+					"http://localhost:9090/api/v1/rules",
+				]);
+				const response: {
+					data: { groups: Array<{ name: string; rules: Array<{ name: string; health: string }> }> };
+				} = JSON.parse(json);
+				rules = response.data.groups.find((g) => g.name === "flop-watch")?.rules ?? [];
+				return rules.length > 0 && rules.every((r) => r.health === "ok");
+			},
+			"the flop-watch rules are evaluated",
+			60_000,
+		);
+		// Architecture §7: 6 recording rules and 14 alerts.
+		assert.equal(rules.length, 20);
+	});
+
 	it("serves Grafana on 127.0.0.1, and publishes nothing else", async () => {
 		const health = await fetch(`http://127.0.0.1:${grafanaPort}/api/health`);
 		assert.equal(health.status, 200);

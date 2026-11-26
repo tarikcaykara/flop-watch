@@ -1,0 +1,454 @@
+# promtool tests for the recording rules and alerts (architecture §7). Run: pnpm test:rules.
+rule_files:
+  - ../rules/flop-watch.rules.yml
+evaluation_interval: 15s
+
+tests:
+  - name: recording rules
+    interval: 15s
+    input_series:
+      - series: flopwatch_chain_best_block_number{network="testnet"}
+        values: 100x20
+      - series: flopwatch_chain_finalized_block_number{network="testnet"}
+        values: 95x20
+      # Devnet's mixed WebSocket backends can put the finalized head ahead of the best one.
+      - series: flopwatch_chain_best_block_number{network="devnet"}
+        values: 95x20
+      - series: flopwatch_chain_finalized_block_number{network="devnet"}
+        values: 100x20
+      - series: flopwatch_chain_best_head_received_timestamp_seconds{network="testnet"}
+        values: 100x20
+      - series: flopwatch_chain_finalized_head_received_timestamp_seconds{network="testnet"}
+        values: 90x20
+      - series: flopwatch_faucet_limits_as_of_timestamp_seconds{network="testnet"}
+        values: 60x20
+      - series: flopwatch_explorer_latest_block_number{network="testnet"}
+        values: 90x20
+    promql_expr_test:
+      - expr: flopwatch:finality_lag_blocks
+        eval_time: 2m
+        exp_samples:
+          - labels: flopwatch:finality_lag_blocks{network="testnet"}
+            value: 5
+          - labels: flopwatch:finality_lag_blocks{network="devnet"}
+            value: -5
+      - expr: flopwatch:best_head_age_seconds
+        eval_time: 2m
+        exp_samples:
+          - labels: flopwatch:best_head_age_seconds{network="testnet"}
+            value: 20
+      - expr: flopwatch:finalized_head_age_seconds
+        eval_time: 2m
+        exp_samples:
+          - labels: flopwatch:finalized_head_age_seconds{network="testnet"}
+            value: 30
+      - expr: flopwatch:faucet_limits_age_seconds
+        eval_time: 2m
+        exp_samples:
+          - labels: flopwatch:faucet_limits_age_seconds{network="testnet"}
+            value: 60
+      - expr: flopwatch:explorer_indexer_lag_blocks
+        eval_time: 2m
+        exp_samples:
+          - labels: flopwatch:explorer_indexer_lag_blocks{network="testnet"}
+            value: 10
+
+  # One network per case: the rule must give 1 only when every condition holds, and 0, not an
+  # empty result, when a source failed and its value series are gone (architecture §7).
+  - name: faucet claim readiness mirrors the official page
+    interval: 15s
+    input_series:
+      # ok: everything as the page wants it.
+      - series: flopwatch_faucet_status{network="ok",status="open"}
+        values: 1x20
+      - series: flopwatch_faucet_stale{network="ok"}
+        values: 0x20
+      - series: flopwatch_genesis_match{network="ok",source="faucet"}
+        values: 1x20
+      - series: flopwatch_probe_success{network="ok",target="faucet_limits"}
+        values: 1x20
+      - series: flopwatch_probe_success{network="ok",target="faucet_chain"}
+        values: 1x20
+      # unknown: /limits reports faucet.status "unknown".
+      - series: flopwatch_faucet_status{network="unknown",status="open"}
+        values: 0x20
+      - series: flopwatch_faucet_status{network="unknown",status="unknown"}
+        values: 1x20
+      - series: flopwatch_faucet_stale{network="unknown"}
+        values: 0x20
+      - series: flopwatch_genesis_match{network="unknown",source="faucet"}
+        values: 1x20
+      - series: flopwatch_probe_success{network="unknown",target="faucet_limits"}
+        values: 1x20
+      - series: flopwatch_probe_success{network="unknown",target="faucet_chain"}
+        values: 1x20
+      # chain_down: /chain fails; the kept genesis match must not make it ready.
+      - series: flopwatch_faucet_status{network="chain_down",status="open"}
+        values: 1x20
+      - series: flopwatch_faucet_stale{network="chain_down"}
+        values: 0x20
+      - series: flopwatch_genesis_match{network="chain_down",source="faucet"}
+        values: 1x20
+      - series: flopwatch_probe_success{network="chain_down",target="faucet_limits"}
+        values: 1x20
+      - series: flopwatch_probe_success{network="chain_down",target="faucet_chain"}
+        values: 0x20
+      # limits_down: /limits fails, so its status and stale series are absent.
+      - series: flopwatch_genesis_match{network="limits_down",source="faucet"}
+        values: 1x20
+      - series: flopwatch_probe_success{network="limits_down",target="faucet_limits"}
+        values: 0x20
+      - series: flopwatch_probe_success{network="limits_down",target="faucet_chain"}
+        values: 1x20
+      # stale: /limits says its data is stale.
+      - series: flopwatch_faucet_status{network="stale",status="open"}
+        values: 1x20
+      - series: flopwatch_faucet_stale{network="stale"}
+        values: 1x20
+      - series: flopwatch_genesis_match{network="stale",source="faucet"}
+        values: 1x20
+      - series: flopwatch_probe_success{network="stale",target="faucet_limits"}
+        values: 1x20
+      - series: flopwatch_probe_success{network="stale",target="faucet_chain"}
+        values: 1x20
+      # genesis: the faucet serves another chain.
+      - series: flopwatch_faucet_status{network="genesis",status="open"}
+        values: 1x20
+      - series: flopwatch_faucet_stale{network="genesis"}
+        values: 0x20
+      - series: flopwatch_genesis_match{network="genesis",source="faucet"}
+        values: 0x20
+      - series: flopwatch_probe_success{network="genesis",target="faucet_limits"}
+        values: 1x20
+      - series: flopwatch_probe_success{network="genesis",target="faucet_chain"}
+        values: 1x20
+      # disabled: no faucet probes at all, so no readiness series either.
+      - series: flopwatch_probe_success{network="disabled",target="rpc_http"}
+        values: 1x20
+    promql_expr_test:
+      - expr: flopwatch:faucet_claim_ready
+        eval_time: 2m
+        exp_samples:
+          - labels: flopwatch:faucet_claim_ready{network="ok"}
+            value: 1
+          - labels: flopwatch:faucet_claim_ready{network="unknown"}
+            value: 0
+          - labels: flopwatch:faucet_claim_ready{network="chain_down"}
+            value: 0
+          - labels: flopwatch:faucet_claim_ready{network="limits_down"}
+            value: 0
+          - labels: flopwatch:faucet_claim_ready{network="stale"}
+            value: 0
+          - labels: flopwatch:faucet_claim_ready{network="genesis"}
+            value: 0
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: FlopFaucetClaimsNotReady
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: FlopFaucetClaimsNotReady
+        exp_alerts:
+          - exp_labels: { network: unknown, severity: warning, category: derived }
+            exp_annotations:
+              summary: Faucet claims not ready on unknown, as the official Testnet page checks them
+          - exp_labels: { network: chain_down, severity: warning, category: derived }
+            exp_annotations:
+              summary: Faucet claims not ready on chain_down, as the official Testnet page checks them
+          - exp_labels: { network: limits_down, severity: warning, category: derived }
+            exp_annotations:
+              summary: Faucet claims not ready on limits_down, as the official Testnet page checks them
+          - exp_labels: { network: stale, severity: warning, category: derived }
+            exp_annotations:
+              summary: Faucet claims not ready on stale, as the official Testnet page checks them
+          - exp_labels: { network: genesis, severity: warning, category: derived }
+            exp_annotations:
+              summary: Faucet claims not ready on genesis, as the official Testnet page checks them
+      - eval_time: 6m
+        alertname: FlopFaucetUnreachable
+        exp_alerts:
+          - exp_labels:
+              { network: limits_down, target: faucet_limits, severity: warning, category: measured }
+            exp_annotations:
+              summary: Faucet /limits failing on limits_down
+      - eval_time: 1m
+        alertname: FlopGenesisMismatch
+        exp_alerts:
+          - exp_labels: { network: genesis, source: faucet, severity: critical, category: reported }
+            exp_annotations:
+              summary: Genesis hash from faucet differs from the pinned one on genesis
+
+  # 30 and 120 blocks are the yellowpaper's FinalityLagWarn and FinalityFreezeThreshold.
+  - name: finality thresholds 30 and 120 blocks
+    interval: 15s
+    input_series:
+      - series: flopwatch_chain_best_block_number{network="lag30"}
+        values: 130x40
+      - series: flopwatch_chain_finalized_block_number{network="lag30"}
+        values: 100x40
+      - series: flopwatch_chain_best_block_number{network="lag31"}
+        values: 131x40
+      - series: flopwatch_chain_finalized_block_number{network="lag31"}
+        values: 100x40
+      - series: flopwatch_chain_best_block_number{network="lag120"}
+        values: 220x40
+      - series: flopwatch_chain_finalized_block_number{network="lag120"}
+        values: 100x40
+      - series: flopwatch_chain_best_block_number{network="lag121"}
+        values: 221x40
+      - series: flopwatch_chain_finalized_block_number{network="lag121"}
+        values: 100x40
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FlopFinalityLagging
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: FlopFinalityLagging
+        exp_alerts:
+          - exp_labels: { network: lag31, severity: warning, category: derived }
+            exp_annotations:
+              summary: Finality lag over 30 blocks on lag31 (yellowpaper FinalityLagWarn)
+          - exp_labels: { network: lag120, severity: warning, category: derived }
+            exp_annotations:
+              summary: Finality lag over 30 blocks on lag120 (yellowpaper FinalityLagWarn)
+          - exp_labels: { network: lag121, severity: warning, category: derived }
+            exp_annotations:
+              summary: Finality lag over 30 blocks on lag121 (yellowpaper FinalityLagWarn)
+      - eval_time: 30s
+        alertname: FlopFinalityStalled
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: FlopFinalityStalled
+        exp_alerts:
+          - exp_labels: { network: lag121, severity: critical, category: derived }
+            exp_annotations:
+              summary: >-
+                Finality stalled on lag121: lag over 120 blocks (yellowpaper
+                FinalityFreezeThreshold) or no finalized head for over 120 s (proposed default)
+
+  - name: stale heads
+    interval: 15s
+    input_series:
+      # The finalized head stopped arriving at t=0; the best head keeps arriving.
+      - series: flopwatch_chain_best_head_received_timestamp_seconds{network="testnet"}
+        values: 0+15x40
+      - series: flopwatch_chain_finalized_head_received_timestamp_seconds{network="testnet"}
+        values: 0x40
+      # No new head at all since t=0.
+      - series: flopwatch_chain_best_head_received_timestamp_seconds{network="devnet"}
+        values: 0x40
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: FlopBestHeadStale
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: FlopBestHeadStale
+        exp_alerts:
+          - exp_labels: { network: devnet, severity: warning, category: derived }
+            exp_annotations:
+              summary: No new head over the RPC WebSocket for over 30 s on devnet (proposed default)
+      - eval_time: 2m
+        alertname: FlopFinalityStalled
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: FlopFinalityStalled
+        exp_alerts:
+          - exp_labels: { network: testnet, severity: critical, category: derived }
+            exp_annotations:
+              summary: >-
+                Finality stalled on testnet: lag over 120 blocks (yellowpaper
+                FinalityFreezeThreshold) or no finalized head for over 120 s (proposed default)
+
+  - name: probes down, identity and runtime
+    interval: 15s
+    input_series:
+      - series: flopwatch_probe_success{network="testnet",target="rpc_ws"}
+        values: 0x20
+      - series: flopwatch_probe_success{network="testnet",target="rpc_http"}
+        values: 0x20
+      - series: flopwatch_probe_success{network="testnet",target="explorer_stats"}
+        values: 0x40
+      - series: flopwatch_probe_success{network="devnet",target="rpc_ws"}
+        values: 1x20
+      - series: flopwatch_genesis_match{network="testnet",source="rpc_http"}
+        values: 0x20
+      - series: flopwatch_genesis_match{network="testnet",source="rpc_ws"}
+        values: 1x20
+      - series: flopwatch_runtime_spec_version{network="testnet"}
+        values: 1014034x5 1014035x15
+      - series: up{job="flop-watch",instance="flop-watch:10063"}
+        values: 0x20
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FlopRpcWsDown
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: FlopRpcWsDown
+        exp_alerts:
+          - exp_labels: { network: testnet, target: rpc_ws, severity: critical, category: measured }
+            exp_annotations:
+              summary: RPC WebSocket probe failing on testnet
+      - eval_time: 3m
+        alertname: FlopRpcHttpDown
+        exp_alerts:
+          - exp_labels:
+              { network: testnet, target: rpc_http, severity: critical, category: measured }
+            exp_annotations:
+              summary: RPC HTTP probe failing on testnet
+      - eval_time: 4m
+        alertname: FlopExplorerDown
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: FlopExplorerDown
+        exp_alerts:
+          - exp_labels:
+              { network: testnet, target: explorer_stats, severity: warning, category: measured }
+            exp_annotations:
+              summary: Explorer /api/stats failing on testnet
+      - eval_time: 15s
+        alertname: FlopGenesisMismatch
+        exp_alerts:
+          - exp_labels:
+              { network: testnet, source: rpc_http, severity: critical, category: reported }
+            exp_annotations:
+              summary: Genesis hash from rpc_http differs from the pinned one on testnet
+      - eval_time: 1m
+        alertname: FlopRuntimeUpgraded
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: FlopRuntimeUpgraded
+        exp_alerts:
+          - exp_labels: { network: testnet, severity: info, category: reported }
+            exp_annotations:
+              summary: Runtime spec version changed on testnet
+      - eval_time: 1m
+        alertname: FlopWatchDown
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: FlopWatchDown
+        exp_alerts:
+          - exp_labels:
+              {
+                job: flop-watch,
+                instance: "flop-watch:10063",
+                severity: critical,
+                category: measured,
+              }
+            exp_annotations:
+              summary: Prometheus cannot scrape flop-watch at flop-watch:10063
+
+  - name: faucet and explorer data
+    interval: 15s
+    input_series:
+      - series: flopwatch_faucet_status{network="testnet",status="low_balance"}
+        values: 1x40
+      - series: flopwatch_faucet_status{network="devnet",status="low_balance"}
+        values: 0x40
+      # Testnet's asOf stopped at t=0; Devnet's stays about 290 s old, inside the normal swing.
+      - series: flopwatch_faucet_limits_as_of_timestamp_seconds{network="testnet"}
+        values: 0x60
+      - series: flopwatch_faucet_limits_as_of_timestamp_seconds{network="devnet"}
+        values: -290+15x60
+      # Testnet's explorer is 200 blocks behind; Devnet's is 5 ahead (a negative lag).
+      - series: flopwatch_chain_best_block_number{network="testnet"}
+        values: 300x40
+      - series: flopwatch_explorer_latest_block_number{network="testnet"}
+        values: 100x40
+      - series: flopwatch_chain_best_block_number{network="devnet"}
+        values: 300x40
+      - series: flopwatch_explorer_latest_block_number{network="devnet"}
+        values: 305x40
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: FlopFaucetLowBalance
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: FlopFaucetLowBalance
+        exp_alerts:
+          - exp_labels:
+              { network: testnet, status: low_balance, severity: warning, category: reported }
+            exp_annotations:
+              summary: Faucet reports low_balance on testnet
+      - eval_time: 9m
+        alertname: FlopFaucetLimitsStale
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: FlopFaucetLimitsStale
+        exp_alerts:
+          - exp_labels: { network: testnet, severity: warning, category: derived }
+            exp_annotations:
+              summary: Faucet /limits data older than 5 min on testnet (proposed default)
+      - eval_time: 4m
+        alertname: FlopExplorerIndexerLagging
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: FlopExplorerIndexerLagging
+        exp_alerts:
+          - exp_labels: { network: testnet, severity: warning, category: derived }
+            exp_annotations:
+              summary: Explorer indexer over 120 blocks behind on testnet (proposed default)
+
+  # Each threshold just below and just above, held past its `for`.
+  - name: threshold boundaries
+    interval: 15s
+    input_series:
+      # Head timestamps that advance with time, so each age stays constant.
+      - series: flopwatch_chain_best_head_received_timestamp_seconds{network="best30"}
+        values: -30+15x40
+      - series: flopwatch_chain_best_head_received_timestamp_seconds{network="best31"}
+        values: -31+15x40
+      - series: flopwatch_chain_finalized_head_received_timestamp_seconds{network="final120"}
+        values: -120+15x40
+      - series: flopwatch_chain_finalized_head_received_timestamp_seconds{network="final121"}
+        values: -121+15x40
+      - series: flopwatch_chain_best_block_number{network="explorer120"}
+        values: 220x40
+      - series: flopwatch_explorer_latest_block_number{network="explorer120"}
+        values: 100x40
+      - series: flopwatch_chain_best_block_number{network="explorer121"}
+        values: 221x40
+      - series: flopwatch_explorer_latest_block_number{network="explorer121"}
+        values: 100x40
+      # Another scrape job that is down must not raise FlopWatchDown.
+      - series: up{job="other",instance="other:9100"}
+        values: 0x40
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: FlopBestHeadStale
+        exp_alerts:
+          - exp_labels: { network: best31, severity: warning, category: derived }
+            exp_annotations:
+              summary: No new head over the RPC WebSocket for over 30 s on best31 (proposed default)
+      - eval_time: 3m
+        alertname: FlopFinalityStalled
+        exp_alerts:
+          - exp_labels: { network: final121, severity: critical, category: derived }
+            exp_annotations:
+              summary: >-
+                Finality stalled on final121: lag over 120 blocks (yellowpaper
+                FinalityFreezeThreshold) or no finalized head for over 120 s (proposed default)
+      - eval_time: 6m
+        alertname: FlopExplorerIndexerLagging
+        exp_alerts:
+          - exp_labels: { network: explorer121, severity: warning, category: derived }
+            exp_annotations:
+              summary: Explorer indexer over 120 blocks behind on explorer121 (proposed default)
+      - eval_time: 3m
+        alertname: FlopWatchDown
+        exp_alerts: []
+
+  # A runtime upgrade stays an incident for 15 min, then clears.
+  - name: runtime upgrade window
+    interval: 15s
+    input_series:
+      - series: flopwatch_runtime_spec_version{network="testnet"}
+        values: 1014034 1014035x80
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: FlopRuntimeUpgraded
+        exp_alerts:
+          - exp_labels: { network: testnet, severity: info, category: reported }
+            exp_annotations:
+              summary: Runtime spec version changed on testnet
+      - eval_time: 16m
+        alertname: FlopRuntimeUpgraded
+        exp_alerts: []
