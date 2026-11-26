@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { once } from "node:events";
 import { createServer } from "node:net";
-import { after, before, describe, it } from "node:test";
+import { after, afterEach, before, describe, it } from "node:test";
 import { setTimeout as sleep } from "node:timers/promises";
 import { isDeepStrictEqual, promisify } from "node:util";
 
@@ -159,17 +159,25 @@ describe("compose.yaml", () => {
 describe("the stack", { timeout: 600_000 }, () => {
 	let grafanaPort = 0;
 	let stackEnv: Record<string, string> = {};
-	/** When `docker compose up` started, after the build: the mvp §6 times count from here. */
+	/** When `docker compose up` started, after the pulls and the build: mvp §6 times count from here. */
 	let upAt = 0;
+	let failed = false;
 
 	before(async () => {
 		grafanaPort = await freePort();
 		stackEnv = { GRAFANA_PORT: String(grafanaPort) };
+		await compose(["pull", "prometheus", "grafana"], { env: stackEnv });
 		await compose(["build"], { env: stackEnv });
 		upAt = Date.now();
 		await compose(["up", "-d", "--wait", "--wait-timeout", "240"], { env: stackEnv });
 	});
+	afterEach((t) => {
+		// TestContext.passed exists at run time on Node 24, but @types/node 24 does not declare it.
+		failed ||= "passed" in t && t.passed === false;
+	});
 	after(async () => {
+		// `down` removes the containers, so a failed run prints their logs first.
+		if (failed) console.log(await compose(["logs", "--no-color", "--tail", "100"]));
 		await compose(["down", "--volumes", "--remove-orphans"]);
 	});
 

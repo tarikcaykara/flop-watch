@@ -22,9 +22,10 @@ services:
       FLOPWATCH_TESTNET_EXPECTED_GENESIS: ${E2E_TESTNET_EXPECTED_GENESIS:-}
 
   fake-flop:
-    # The collector's image is the Node runtime already built here, so no other image is pinned.
-    # The fake and the fixtures it reads come from the repository, read-only.
-    build: .
+    # The collector's image, which the flop-watch service builds: the Node runtime, so no other
+    # image is pinned. The fake and the fixtures it reads come from the repository, read-only.
+    image: flop-watch:e2e
+    pull_policy: never
     command: ["node", "/repo/test/e2e/fake-flop.ts"]
     volumes:
       - ./package.json:/repo/package.json:ro
