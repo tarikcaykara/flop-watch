@@ -75,6 +75,29 @@ export async function sample(
 	)?.value;
 }
 
+/** The samples of `metric` with a value other than 0. */
+export async function nonZero(metric: { get(): Promise<{ values: Sample[] }> }): Promise<Sample[]> {
+	const { values } = await metric.get();
+	return values.filter((v) => v.value !== 0);
+}
+
+/**
+ * The sorted values of `label` across the samples of `metric` whose labels include `labels`;
+ * fails unless every one of those samples is 0.
+ */
+export async function zeroSeries(
+	metric: { get(): Promise<{ values: Sample[] }> },
+	labels: Record<string, string>,
+	label: string,
+): Promise<string[]> {
+	const { values } = await metric.get();
+	const matching = values.filter((v) =>
+		Object.entries(labels).every(([k, value]) => v.labels[k] === value),
+	);
+	for (const v of matching) assert.equal(v.value, 0, `${label}=${String(v.labels[label])}`);
+	return matching.map((v) => String(v.labels[label])).toSorted();
+}
+
 interface ServiceFixtures {
 	networks: Record<string, Record<string, Record<string, unknown>>>;
 }

@@ -138,8 +138,11 @@ describe("collector process", () => {
 			await ready;
 			assert.equal((await fetch(`http://127.0.0.1:${port}/healthz`)).status, 200);
 			const series = (target: string) =>
-				`flopwatch_probe_total{network="testnet",target="${target}",result="network_error"}`;
+				`flopwatch_probe_total{network="testnet",target="${target}",result="network_error"} `;
 			const scrape = async () => (await fetch(`http://127.0.0.1:${port}/metrics`)).text();
+			/** True once the series has counted a request: it exists at 0 from the start. */
+			const counted = (body: string, target: string) =>
+				body.split("\n").some((line) => line.startsWith(series(target)) && !line.endsWith(" 0"));
 			// The HTTP probes start after up to 5 s of jitter; a closed port fails at once.
 			await eventually(
 				async () => {
@@ -151,7 +154,7 @@ describe("collector process", () => {
 						"faucet_health",
 						"faucet_chain",
 						"explorer_stats",
-					].every((target) => body.includes(series(target)));
+					].every((target) => counted(body, target));
 				},
 				"every worker running",
 				8_000,
