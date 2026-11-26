@@ -98,16 +98,24 @@ type Convert<T> = (v: unknown) => T | null;
 
 const GENESIS_RE = /^0x[0-9a-f]{64}$/;
 const FLOP_RE = /^\d+(?:\.\d+)?$/;
+const ISO_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/** Stands for a path through a step that exists but is not an object; every converter rejects it. */
+const NOT_OBJECT = Symbol("not an object");
 
 function isRecord(v: unknown): v is Record<string, unknown> {
 	return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-/** The value at a dotted path, or undefined as soon as a step is not an object. */
+/**
+ * The value at a dotted path. A missing or null step gives that value (undefined or null); a step
+ * that exists but is not an object gives NOT_OBJECT.
+ */
 function at(body: unknown, path: string): unknown {
 	let value = body;
 	for (const key of path.split(".")) {
-		if (!isRecord(value)) return undefined;
+		if (value === undefined || value === null) return value;
+		if (!isRecord(value)) return NOT_OBJECT;
 		value = value[key];
 	}
 	return value;
@@ -124,9 +132,12 @@ const asFlop: Convert<number> = (v) => {
 	return Number.isFinite(n) ? n : null;
 };
 
-/** A date string, as Unix seconds. */
+/**
+ * An ISO 8601 date-time with an explicit zone, as `toISOString()` writes it, in Unix seconds. A
+ * zone-less string would be read in the host's time zone, so it is a mismatch.
+ */
 const asTimestamp: Convert<number> = (v) => {
-	if (typeof v !== "string") return null;
+	if (typeof v !== "string" || !ISO_TIME_RE.test(v)) return null;
 	const ms = Date.parse(v);
 	return Number.isNaN(ms) ? null : ms / 1000;
 };
@@ -145,7 +156,10 @@ interface Reader<F extends string> {
 	readonly mismatches: F[];
 	/** A required field: missing, null or retyped records a mismatch. */
 	read<T>(field: F, convert: Convert<T>): T | null;
-	/** An optional field: missing or null gives null silently; retyped records a mismatch. */
+	/**
+	 * An optional field: missing or null, there or anywhere on its path, gives null silently; a
+	 * non-object on the path or a retyped value records a mismatch.
+	 */
 	readOptional<T>(field: F, convert: Convert<T>): T | null;
 }
 
@@ -189,18 +203,20 @@ export function parseFaucetLimits(body: unknown): Parsed<FaucetLimits, LimitsFie
 export function parseFaucetHealth(body: unknown): Parsed<FaucetHealth, HealthField> {
 	const { mismatches, read, readOptional } = reader<HealthField>(body);
 	const ready = read("ready", asBoolean);
-	// Records the mismatch only; under a non-object, the optional reads below stay silent.
-	read("dependencies", (v) => (isRecord(v) ? true : null));
+	// A missing or non-object `dependencies` is one mismatch; the fields below it are then not read.
+	const hasDependencies = read("dependencies", (v) => (isRecord(v) ? true : null)) !== null;
+	const readDependency = <T>(field: HealthField, convert: Convert<T>): T | null =>
+		hasDependencies ? readOptional(field, convert) : null;
 	const value: FaucetHealth = {
 		ready,
 		dependencyOk: {
-			signer: readOptional("dependencies.signer.ok", asBoolean),
-			indexer: readOptional("dependencies.indexer.ok", asBoolean),
-			ip_classification: readOptional("dependencies.ip_classification.ok", asBoolean),
-			funding: readOptional("dependencies.funding.ok", asBoolean),
-			signing: readOptional("dependencies.signing.ok", asBoolean),
+			signer: readDependency("dependencies.signer.ok", asBoolean),
+			indexer: readDependency("dependencies.indexer.ok", asBoolean),
+			ip_classification: readDependency("dependencies.ip_classification.ok", asBoolean),
+			funding: readDependency("dependencies.funding.ok", asBoolean),
+			signing: readDependency("dependencies.signing.ok", asBoolean),
 		},
-		indexerLagBlocks: readOptional("dependencies.indexer.details.lagBlocks", asNumber),
+		indexerLagBlocks: readDependency("dependencies.indexer.details.lagBlocks", asNumber),
 	};
 	return { value, mismatches };
 }

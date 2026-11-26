@@ -247,10 +247,39 @@ describe("parseFaucetHealth: dependencies", () => {
 		);
 	});
 
-	it("ok: null is absent, not a mismatch", () => {
-		const parsed = parseFaucetHealth(withField(source, "dependencies.signer.ok", null));
-		assert.equal(parsed.value.dependencyOk.signer, null);
-		assert.deepStrictEqual(parsed.mismatches, []);
+	it("null anywhere on an optional path is absent, not a mismatch", () => {
+		const signer = parseFaucetHealth(withField(source, "dependencies.signer.ok", null));
+		assert.equal(signer.value.dependencyOk.signer, null);
+		assert.deepStrictEqual(signer.mismatches, []);
+
+		const lag = parseFaucetHealth(
+			withField(source, "dependencies.indexer.details.lagBlocks", null),
+		);
+		assert.equal(lag.value.indexerLagBlocks, null);
+		assert.deepStrictEqual(lag.mismatches, []);
+
+		const indexer = parseFaucetHealth(withField(source, "dependencies.indexer", null));
+		assert.equal(indexer.value.dependencyOk.indexer, null);
+		assert.equal(indexer.value.indexerLagBlocks, null);
+		assert.deepStrictEqual(indexer.mismatches, []);
+	});
+
+	it("a non-object step below dependencies is a mismatch of each field under it", () => {
+		const indexer = parseFaucetHealth(withField(source, "dependencies.indexer", []));
+		assert.equal(indexer.value.dependencyOk.indexer, null);
+		assert.equal(indexer.value.indexerLagBlocks, null);
+		assert.equal(indexer.value.dependencyOk.signer, true);
+		assert.deepStrictEqual(indexer.mismatches, [
+			"dependencies.indexer.ok",
+			"dependencies.indexer.details.lagBlocks",
+		]);
+
+		const signer = parseFaucetHealth(withField(source, "dependencies.signer", "x"));
+		assert.deepStrictEqual(signer.mismatches, ["dependencies.signer.ok"]);
+
+		const details = parseFaucetHealth(withField(source, "dependencies.indexer.details", "x"));
+		assert.equal(details.value.dependencyOk.indexer, true);
+		assert.deepStrictEqual(details.mismatches, ["dependencies.indexer.details.lagBlocks"]);
 	});
 
 	it("a retyped ok is a mismatch", () => {
@@ -267,6 +296,7 @@ describe("parseFaucetLimits: enums", () => {
 		["unknown", "unknown"],
 		["low_balance", "low_balance"],
 		["paused", "other"],
+		["", "other"],
 	]) {
 		it(`faucet.status "${status}" maps to ${expected}`, () => {
 			const parsed = parseFaucetLimits(withField(source, "faucet.status", status));
@@ -275,7 +305,15 @@ describe("parseFaucetLimits: enums", () => {
 		});
 	}
 
-	it("the observed unknown shape: faucet and both sponsor lanes unknown", () => {
+	it("a null or non-string faucet.status is a mismatch", () => {
+		for (const status of [null, 5, true]) {
+			const parsed = parseFaucetLimits(withField(source, "faucet.status", status));
+			assert.equal(parsed.value.status, null);
+			assert.deepStrictEqual(parsed.mismatches, ["faucet.status"]);
+		}
+	});
+
+	it("faucet and both sponsor lanes unknown, sponsor shape as in research §6", () => {
 		let unknown = withField(source, "faucet.status", "unknown");
 		for (const lane of ["miner", "validator"]) {
 			unknown = withField(unknown, `sponsor.${lane}`, {
@@ -316,10 +354,37 @@ describe("parseFaucetLimits: amounts and time", () => {
 		});
 	}
 
-	it("an unparseable asOf is a mismatch", () => {
-		const parsed = parseFaucetLimits(withField(source, "asOf", "not a date"));
-		assert.equal(parsed.value.asOfSeconds, null);
-		assert.deepStrictEqual(parsed.mismatches, ["asOf"]);
+	it("an amount beyond the float range is a mismatch", () => {
+		const parsed = parseFaucetLimits(
+			withField(source, "faucet.balanceFlop", `1${"0".repeat(400)}`),
+		);
+		assert.equal(parsed.value.balanceFlop, null);
+		assert.deepStrictEqual(parsed.mismatches, ["faucet.balanceFlop"]);
+	});
+
+	it("an explicit offset gives the same instant as Z", () => {
+		const parsed = parseFaucetLimits(withField(source, "asOf", "2026-11-25T20:00:09.361+01:00"));
+		assert.equal(parsed.value.asOfSeconds, Date.parse("2026-11-25T19:00:09.361Z") / 1000);
+		assert.deepStrictEqual(parsed.mismatches, []);
+	});
+
+	for (const asOf of ["not a date", "12", "2026-11-25", "2026-11-25T19:00:09", 1795633209]) {
+		it(`asOf ${JSON.stringify(asOf)} (no zone, or not ISO 8601) is a mismatch`, () => {
+			const parsed = parseFaucetLimits(withField(source, "asOf", asOf));
+			assert.equal(parsed.value.asOfSeconds, null);
+			assert.deepStrictEqual(parsed.mismatches, ["asOf"]);
+		});
+	}
+});
+
+describe("parseExplorerStats: numbers", () => {
+	it("a non-finite number is a mismatch", () => {
+		const source = body("devnet", "explorer_stats", 200);
+		for (const n of [Number.POSITIVE_INFINITY, Number.NaN]) {
+			const parsed = parseExplorerStats(withField(source, "latestBlockNumber", n));
+			assert.equal(parsed.value.latestBlockNumber, null);
+			assert.deepStrictEqual(parsed.mismatches, ["latestBlockNumber"]);
+		}
 	});
 });
 

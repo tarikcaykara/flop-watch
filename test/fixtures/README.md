@@ -45,3 +45,6 @@ Layout: `networks.<devnet|testnet>.<target>.<HTTP status>` → body, where `<tar
 
 The bodies are verbatim, so they include the public faucet and sponsor signer addresses. The
 parsers never read them.
+
+No `/limits` body with `faucet.status: "unknown"` was recorded. The tests build that state from
+the Devnet body, with the sponsor shape documented in `docs/research.md` §6.
