@@ -35,6 +35,12 @@ jobs:
         run: pnpm typecheck
       - name: Test
         run: pnpm test
+      # promtool check config, check rules and test rules, in the Prometheus image that compose.yaml
+      # pins (architecture §7).
+      - name: Prometheus config and rules
+        run: pnpm test:rules
+      - name: Collector image build
+        run: docker build .
       # Last, so a registry outage or a new advisory never hides code results.
       - name: Dependency audit
         run: pnpm audit:deps

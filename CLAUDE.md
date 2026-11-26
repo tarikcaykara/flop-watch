@@ -75,9 +75,9 @@ pnpm dashboard    # regenerate grafana/dashboards/ from grafana/dashboard.ts, fr
 ```
 
 The gate is `pnpm check && pnpm typecheck && pnpm test && pnpm audit:deps`. Run it before every
-push; CI runs the same, with the audit last. Run `pnpm test:rules` and `pnpm test:e2e` too before
-pushing a change to the Dockerfile, `compose.yaml`, `prometheus/` or `grafana/`; CI runs them from
-#15 and #38.
+push. CI runs the same plus `pnpm test:rules` and `docker build .`, with the audit last. Run
+`pnpm test:rules` and `pnpm test:e2e` too before pushing a change to the Dockerfile,
+`compose.yaml`, `prometheus/` or `grafana/`; CI runs the e2e from #38.
 
 ## Workflow
 
@@ -122,6 +122,8 @@ pushing a change to the Dockerfile, `compose.yaml`, `prometheus/` or `grafana/`;
   - a new runtime dependency, or any major version update;
   - a Dependabot PR in the `runtime` group (any production dependency; today only
     `@prometheus-io/client`, which is still 0.x);
+  - a Dependabot PR in an `images` group (the Node base image in the Dockerfile, Prometheus and
+    Grafana in `compose.yaml`);
   - the licence, the hard rules or this list.
 
   Such a PR's body opens with `Owner review: <item>`. Claude stops once CI is green and the review
@@ -129,7 +131,7 @@ pushing a change to the Dockerfile, `compose.yaml`, `prometheus/` or `grafana/`;
 - **Dependabot.** `.github/dependabot.yml` opens monthly update PRs after a 7-day cooldown;
   security updates come at once. Each PR gets the reviewer-agent pass, which reads the changelogs
   between the two versions, and a green gate. Claude merges the `tooling` and `actions` groups; the
-  owner merges the `runtime` group and every major. Nothing auto-merges.
+  owner merges the `runtime` and `images` groups and every major. Nothing auto-merges.
 - **Dependency audit.** A moderate or higher advisory turns the gate red, so every PR is red
   until it is triaged; this is deliberate. While the repo is idle, Dependabot alerts report new
   advisories. Fix an advisory with an update through a PR. Only when no fixed version fits and the
