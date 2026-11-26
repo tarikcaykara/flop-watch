@@ -31,14 +31,16 @@ flop-watch is a community project. It is not affiliated with or endorsed by FLOP
 
 ## Running the stack
 
-With Docker and Docker Compose, the collector, Prometheus and Grafana run together:
+With Docker Engine 25+ and Docker Compose 2.24+, the collector, Prometheus and Grafana run
+together:
 
 ```bash
 cp .env.example .env    # set GRAFANA_ADMIN_PASSWORD
 docker compose up -d    # Grafana on http://127.0.0.1:3000
 ```
 
-Only Grafana is published, and only on `127.0.0.1`. The dashboard arrives with M3.
+Only Grafana is published, and only on `127.0.0.1`. Grafana takes the admin password from `.env`
+only on its first start; after that, change it in Grafana. The dashboard arrives with M3.
 
 ## Running the collector
 

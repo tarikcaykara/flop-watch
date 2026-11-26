@@ -2,6 +2,8 @@
 # closed local port, so every probe fails at once and the stack itself is what gets tested.
 services:
   flop-watch:
+    # Its own tag, so the e2e never replaces the image of a stack the developer runs.
+    image: flop-watch:e2e
     env_file: !reset []
     environment:
       FLOPWATCH_NETWORKS: testnet

@@ -15,5 +15,5 @@ COPY src ./src
 USER node
 EXPOSE 10063
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --start-interval=2s --retries=3 \
-  CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.FLOPWATCH_PORT || 10063) + '/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+  CMD ["node", "-e", "fetch('http://127.0.0.1:' + ((process.env.FLOPWATCH_PORT || '').trim() || 10063) + '/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 CMD ["node", "src/main.ts"]

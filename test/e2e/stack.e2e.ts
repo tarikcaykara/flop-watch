@@ -67,6 +67,8 @@ describe("compose.yaml", () => {
 		const json = await compose(["config", "--format", "json"], {
 			files: ["compose.yaml"],
 			envFile: ".env.example",
+			// An exported GRAFANA_PORT would win over the env file; empty keeps compose's default.
+			env: { GRAFANA_PORT: "" },
 		});
 		const config: ComposeConfig = JSON.parse(json);
 		services = config.services;

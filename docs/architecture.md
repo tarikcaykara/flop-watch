@@ -392,16 +392,18 @@ annotation, because Grafana reads firing alerts from the `ALERTS` series, which 
 ## 10. Deployment
 
 - **`compose.yaml`** has three services:
-  - `flop-watch`: the collector, built from the repository. It reads `.env` (optional, so
-    `docker compose config` works on a fresh clone) and is not published; Prometheus scrapes it on
-    the Compose network.
+  - `flop-watch`: the collector, built from the repository, and not published; Prometheus scrapes
+    it on the Compose network. It gets the whole `.env`, so the unknown-variable check (§9) still
+    catches a mistyped `FLOPWATCH_*` name; the cost is that `GRAFANA_ADMIN_PASSWORD` is in its
+    environment too, unused. The `.env` is optional only so the stack's checks can run with another
+    env file; a missing `.env` still stops `docker compose up` at the `GRAFANA_ADMIN_PASSWORD` check.
   - `prometheus`: `--storage.tsdb.retention.time=180d`, `--query.timeout=20s`,
     `--query.max-samples=5000000`. It reads `prometheus/prometheus.yml`, whose scrape job is named
     `flop-watch` ([dashboard.md](dashboard.md) §7), and is not published. #13 adds the rules.
   - `grafana`: published **only** on `127.0.0.1`, port `GRAFANA_PORT` (default 3000). The admin
-    password comes from `GRAFANA_ADMIN_PASSWORD` in `.env`. Usage reporting, update checks and
-    plugin preinstalls are off, so the stack sends nothing to grafana.com. #14 provisions the
-    datasource and dashboard.
+    password comes from `GRAFANA_ADMIN_PASSWORD` in `.env`, and only when the Grafana database is
+    first created. Usage reporting, update checks and plugin preinstalls are off; #14 sets the rest
+    of §11 and provisions the datasource and dashboard.
   - Prometheus and Grafana images are pinned to exact versions; Prometheus and Grafana have
     healthchecks, so `docker compose up --wait` returns once the stack is ready.
 - **Volumes.** Named volumes for Prometheus and Grafana data.
