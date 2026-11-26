@@ -18,6 +18,7 @@
 		"format": "biome check --write .",
 		"typecheck": "tsc --noEmit",
 		"test": "node --test \"test/**/*.test.ts\"",
+		"test:e2e": "node --test --test-concurrency=1 \"test/e2e/*.e2e.ts\"",
 		"audit:deps": "pnpm audit --audit-level=moderate"
 	},
 	"devDependencies": {

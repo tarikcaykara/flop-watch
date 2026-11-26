@@ -1,0 +1,11 @@
+# The e2e stack (`pnpm test:e2e`): the collector talks to no FLOP host. Its endpoints are a
+# closed local port, so every probe fails at once and the stack itself is what gets tested.
+services:
+  flop-watch:
+    env_file: !reset []
+    environment:
+      FLOPWATCH_NETWORKS: testnet
+      FLOPWATCH_TESTNET_RPC_WS: ws://127.0.0.1:9
+      FLOPWATCH_TESTNET_RPC_HTTP: http://127.0.0.1:9
+      FLOPWATCH_TESTNET_FAUCET_URL: ""
+      FLOPWATCH_TESTNET_EXPLORER_API_URL: ""
