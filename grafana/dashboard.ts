@@ -310,7 +310,7 @@ const CLAIMS_READY =
 
 const about: Spec = {
 	w: 24,
-	h: 4,
+	h: 7,
 	body: {
 		type: "text",
 		title: "About",

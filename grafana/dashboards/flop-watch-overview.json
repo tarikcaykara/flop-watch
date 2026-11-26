@@ -74,7 +74,7 @@
 		{
 			"id": 1,
 			"gridPos": {
-				"h": 4,
+				"h": 7,
 				"w": 24,
 				"x": 0,
 				"y": 0
@@ -94,7 +94,7 @@
 				"h": 1,
 				"w": 24,
 				"x": 0,
-				"y": 4
+				"y": 7
 			},
 			"collapsed": false,
 			"panels": []
@@ -105,7 +105,7 @@
 				"h": 4,
 				"w": 6,
 				"x": 0,
-				"y": 5
+				"y": 8
 			},
 			"type": "stat",
 			"title": "RPC WebSocket",
@@ -185,7 +185,7 @@
 				"h": 4,
 				"w": 6,
 				"x": 6,
-				"y": 5
+				"y": 8
 			},
 			"type": "stat",
 			"title": "RPC HTTP",
@@ -265,7 +265,7 @@
 				"h": 4,
 				"w": 6,
 				"x": 12,
-				"y": 5
+				"y": 8
 			},
 			"type": "stat",
 			"title": "Best head age",
@@ -337,7 +337,7 @@
 				"h": 4,
 				"w": 6,
 				"x": 18,
-				"y": 5
+				"y": 8
 			},
 			"type": "stat",
 			"title": "Finality lag",
@@ -409,7 +409,7 @@
 				"h": 4,
 				"w": 6,
 				"x": 0,
-				"y": 9
+				"y": 12
 			},
 			"type": "stat",
 			"title": "Faucet claims",
@@ -489,7 +489,7 @@
 				"h": 4,
 				"w": 6,
 				"x": 6,
-				"y": 9
+				"y": 12
 			},
 			"type": "stat",
 			"title": "Faucet status",
@@ -579,7 +579,7 @@
 				"h": 4,
 				"w": 6,
 				"x": 12,
-				"y": 9
+				"y": 12
 			},
 			"type": "stat",
 			"title": "Explorer",
@@ -659,7 +659,7 @@
 				"h": 4,
 				"w": 6,
 				"x": 18,
-				"y": 9
+				"y": 12
 			},
 			"type": "stat",
 			"title": "Genesis",
@@ -741,7 +741,7 @@
 				"h": 1,
 				"w": 24,
 				"x": 0,
-				"y": 13
+				"y": 16
 			},
 			"collapsed": false,
 			"panels": []
@@ -752,7 +752,7 @@
 				"h": 8,
 				"w": 24,
 				"x": 0,
-				"y": 14
+				"y": 17
 			},
 			"type": "state-timeline",
 			"title": "Incidents",
@@ -837,7 +837,7 @@
 				"h": 6,
 				"w": 12,
 				"x": 0,
-				"y": 22
+				"y": 25
 			},
 			"type": "table",
 			"title": "Firing now",
@@ -909,7 +909,7 @@
 				"h": 6,
 				"w": 12,
 				"x": 12,
-				"y": 22
+				"y": 25
 			},
 			"type": "table",
 			"title": "Last successful probe",
@@ -998,7 +998,7 @@
 				"h": 1,
 				"w": 24,
 				"x": 0,
-				"y": 28
+				"y": 31
 			},
 			"collapsed": false,
 			"panels": []
@@ -1009,7 +1009,7 @@
 				"h": 6,
 				"w": 12,
 				"x": 0,
-				"y": 29
+				"y": 32
 			},
 			"type": "state-timeline",
 			"title": "RPC availability",
@@ -1106,7 +1106,7 @@
 				"h": 6,
 				"w": 12,
 				"x": 12,
-				"y": 29
+				"y": 32
 			},
 			"type": "timeseries",
 			"title": "RPC latency",
@@ -1190,7 +1190,7 @@
 				"h": 6,
 				"w": 8,
 				"x": 0,
-				"y": 35
+				"y": 38
 			},
 			"type": "timeseries",
 			"title": "RPC failures",
@@ -1265,7 +1265,7 @@
 				"h": 6,
 				"w": 8,
 				"x": 8,
-				"y": 35
+				"y": 38
 			},
 			"type": "timeseries",
 			"title": "WebSocket reconnects",
@@ -1351,7 +1351,7 @@
 				"h": 6,
 				"w": 8,
 				"x": 16,
-				"y": 35
+				"y": 38
 			},
 			"type": "timeseries",
 			"title": "Node peers and syncing",
@@ -1463,7 +1463,7 @@
 				"h": 1,
 				"w": 24,
 				"x": 0,
-				"y": 41
+				"y": 44
 			},
 			"collapsed": false,
 			"panels": []
@@ -1474,7 +1474,7 @@
 				"h": 3,
 				"w": 24,
 				"x": 0,
-				"y": 42
+				"y": 45
 			},
 			"type": "stat",
 			"title": "Heads now",
@@ -1571,7 +1571,7 @@
 				"h": 7,
 				"w": 12,
 				"x": 0,
-				"y": 45
+				"y": 48
 			},
 			"type": "timeseries",
 			"title": "Finality lag",
@@ -1657,7 +1657,7 @@
 				"h": 7,
 				"w": 12,
 				"x": 12,
-				"y": 45
+				"y": 48
 			},
 			"type": "timeseries",
 			"title": "Head age",
@@ -1802,7 +1802,7 @@
 				"h": 7,
 				"w": 12,
 				"x": 0,
-				"y": 52
+				"y": 55
 			},
 			"type": "heatmap",
 			"title": "Block interval",
@@ -1866,7 +1866,7 @@
 				"h": 7,
 				"w": 12,
 				"x": 12,
-				"y": 52
+				"y": 55
 			},
 			"type": "timeseries",
 			"title": "Skipped and rewound heads",
@@ -1954,7 +1954,7 @@
 				"h": 1,
 				"w": 24,
 				"x": 0,
-				"y": 59
+				"y": 62
 			},
 			"collapsed": false,
 			"panels": []
@@ -1965,7 +1965,7 @@
 				"h": 5,
 				"w": 12,
 				"x": 0,
-				"y": 60
+				"y": 63
 			},
 			"type": "state-timeline",
 			"title": "Claims ready",
@@ -2040,7 +2040,7 @@
 				"h": 5,
 				"w": 12,
 				"x": 12,
-				"y": 60
+				"y": 63
 			},
 			"type": "state-timeline",
 			"title": "Faucet probes",
@@ -2115,7 +2115,7 @@
 				"h": 5,
 				"w": 12,
 				"x": 0,
-				"y": 65
+				"y": 68
 			},
 			"type": "state-timeline",
 			"title": "Status",
@@ -2252,7 +2252,7 @@
 				"h": 5,
 				"w": 12,
 				"x": 12,
-				"y": 65
+				"y": 68
 			},
 			"type": "state-timeline",
 			"title": "Sponsor lanes",
@@ -2342,7 +2342,7 @@
 				"h": 6,
 				"w": 8,
 				"x": 0,
-				"y": 70
+				"y": 73
 			},
 			"type": "timeseries",
 			"title": "Balance",
@@ -2444,7 +2444,7 @@
 				"h": 6,
 				"w": 8,
 				"x": 8,
-				"y": 70
+				"y": 73
 			},
 			"type": "timeseries",
 			"title": "Daily cap",
@@ -2557,7 +2557,7 @@
 				"h": 6,
 				"w": 8,
 				"x": 16,
-				"y": 70
+				"y": 73
 			},
 			"type": "timeseries",
 			"title": "Pending grants",
@@ -2631,7 +2631,7 @@
 				"h": 5,
 				"w": 12,
 				"x": 0,
-				"y": 76
+				"y": 79
 			},
 			"type": "state-timeline",
 			"title": "/health",
@@ -2775,7 +2775,7 @@
 				"h": 5,
 				"w": 12,
 				"x": 12,
-				"y": 76
+				"y": 79
 			},
 			"type": "state-timeline",
 			"title": "Dependencies",
@@ -2850,7 +2850,7 @@
 				"h": 6,
 				"w": 8,
 				"x": 0,
-				"y": 81
+				"y": 84
 			},
 			"type": "timeseries",
 			"title": "Indexer lag (faucet)",
@@ -2924,7 +2924,7 @@
 				"h": 6,
 				"w": 8,
 				"x": 8,
-				"y": 81
+				"y": 84
 			},
 			"type": "timeseries",
 			"title": "/limits data age",
@@ -3001,7 +3001,7 @@
 				"h": 6,
 				"w": 8,
 				"x": 16,
-				"y": 81
+				"y": 84
 			},
 			"type": "timeseries",
 			"title": "Response time",
@@ -3076,7 +3076,7 @@
 				"h": 1,
 				"w": 24,
 				"x": 0,
-				"y": 87
+				"y": 90
 			},
 			"collapsed": false,
 			"panels": []
@@ -3087,7 +3087,7 @@
 				"h": 6,
 				"w": 8,
 				"x": 0,
-				"y": 88
+				"y": 91
 			},
 			"type": "state-timeline",
 			"title": "Explorer probe",
@@ -3162,7 +3162,7 @@
 				"h": 6,
 				"w": 8,
 				"x": 8,
-				"y": 88
+				"y": 91
 			},
 			"type": "timeseries",
 			"title": "Indexer lag (explorer)",
@@ -3244,7 +3244,7 @@
 				"h": 6,
 				"w": 8,
 				"x": 16,
-				"y": 88
+				"y": 91
 			},
 			"type": "timeseries",
 			"title": "Finality view (explorer)",
@@ -3360,7 +3360,7 @@
 				"h": 1,
 				"w": 24,
 				"x": 0,
-				"y": 94
+				"y": 97
 			},
 			"collapsed": true,
 			"panels": [
@@ -3370,7 +3370,7 @@
 						"h": 5,
 						"w": 12,
 						"x": 0,
-						"y": 95
+						"y": 98
 					},
 					"type": "table",
 					"title": "Chain identity",
@@ -3442,7 +3442,7 @@
 						"h": 5,
 						"w": 12,
 						"x": 12,
-						"y": 95
+						"y": 98
 					},
 					"type": "state-timeline",
 					"title": "Genesis match",
@@ -3517,7 +3517,7 @@
 						"h": 5,
 						"w": 12,
 						"x": 0,
-						"y": 100
+						"y": 103
 					},
 					"type": "timeseries",
 					"title": "Runtime version",
@@ -3591,7 +3591,7 @@
 						"h": 5,
 						"w": 12,
 						"x": 12,
-						"y": 100
+						"y": 103
 					},
 					"type": "stat",
 					"title": "Slot duration",
@@ -3659,7 +3659,7 @@
 				"h": 1,
 				"w": 24,
 				"x": 0,
-				"y": 95
+				"y": 98
 			},
 			"collapsed": true,
 			"panels": [
@@ -3669,7 +3669,7 @@
 						"h": 4,
 						"w": 6,
 						"x": 0,
-						"y": 96
+						"y": 99
 					},
 					"type": "stat",
 					"title": "Version",
@@ -3734,7 +3734,7 @@
 						"h": 6,
 						"w": 9,
 						"x": 6,
-						"y": 96
+						"y": 99
 					},
 					"type": "timeseries",
 					"title": "Requests to FLOP",
@@ -3811,7 +3811,7 @@
 						"h": 6,
 						"w": 9,
 						"x": 15,
-						"y": 96
+						"y": 99
 					},
 					"type": "timeseries",
 					"title": "Memory",
@@ -3888,7 +3888,7 @@
 						"h": 6,
 						"w": 24,
 						"x": 0,
-						"y": 102
+						"y": 105
 					},
 					"type": "table",
 					"title": "Schema mismatches",

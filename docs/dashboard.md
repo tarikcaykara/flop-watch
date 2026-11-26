@@ -99,7 +99,7 @@ Grafana's grid is 24 columns wide; sizes are width × height in grid units.
 
 | Row | State | Panels |
 |---|---|---|
-| (top) | — | About (24×4) |
+| (top) | — | About (24×7, tall enough for the text on a phone) |
 | Now | open | 8 stats in two lines of four (6×4 each), so the titles fit next to the sidebar |
 | Incidents | open | Incidents (24×8); Firing now (12×6), Last successful probe (12×6) |
 | RPC | open | Availability (12×6), Latency (12×6); Failures (8×6), WebSocket reconnects (8×6), Node peers and syncing (8×6) |
@@ -113,7 +113,7 @@ Grafana's grid is 24 columns wide; sizes are width × height in grid units.
 
 ### About
 
-- **A1 About** · text, 24×4
+- **A1 About** · text, 24×7
   - Content (Markdown): "Independent, read-only monitor of FLOP Network Devnet and Testnet,
     from a single vantage point. Not affiliated with FLOP Labs. **Measured**: observed by
     flop-watch. **Reported**: stated by a FLOP node or service. **Derived**: computed by a rule
