@@ -19,6 +19,7 @@
 		"typecheck": "tsc --noEmit",
 		"test": "node --test \"test/**/*.test.ts\"",
 		"test:e2e": "node --test --test-concurrency=1 \"test/e2e/*.e2e.ts\"",
+		"test:rules": "docker run --rm -v \"$PWD/prometheus:/etc/prometheus:ro\" --entrypoint sh \"$(docker compose --env-file .env.example config --images | grep '^prom/prometheus:')\" -c 'cd /etc/prometheus && promtool check config prometheus.yml && promtool check rules rules/*.yml && promtool test rules tests/*.yml'",
 		"audit:deps": "pnpm audit --audit-level=moderate"
 	},
 	"devDependencies": {
