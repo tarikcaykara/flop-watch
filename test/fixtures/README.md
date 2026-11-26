@@ -25,3 +25,26 @@ The values were cross-checked independently of `src/` while recording:
 
 `babeConfiguration` is the raw result of `state_call ["BabeApi_configuration", "0x"]` on each
 network.
+
+## `services.json`
+
+The faucet and explorer response bodies recorded by the research probe, copied unchanged:
+
+- `poc/results/2026-11-25/services.json`, the `firstBodies` of each network, recorded at about
+  19:00Z (`recordedAt`);
+- the Testnet `/chain` 200 body from `poc/results/2026-11-25/services-testnet-recheck.json`,
+  recorded at about 19:13Z (`recheckedAt`). The first run got a 503 there.
+
+Layout: `networks.<devnet|testnet>.<target>.<HTTP status>` → body, where `<target>` is
+`faucet_limits`, `faucet_health`, `faucet_chain` or `explorer_stats`.
+
+| Network | `faucet_limits` | `faucet_health` | `faucet_chain` | `explorer_stats` |
+|---|---|---|---|---|
+| devnet | 200 | 200 | 200 | 200 |
+| testnet | 200 | 503 | 503, 200 | 503 |
+
+The bodies are verbatim, so they include the public faucet and sponsor signer addresses. The
+parsers never read them.
+
+No `/limits` body with `faucet.status: "unknown"` was recorded. The tests build that state from
+the Devnet body, with the sponsor shape documented in `docs/research.md` §6.
