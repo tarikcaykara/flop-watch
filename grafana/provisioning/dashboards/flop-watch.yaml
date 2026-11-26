@@ -1,0 +1,10 @@
+# The flop-watch dashboards, read from the repository (architecture §8). They are not editable in
+# Grafana: grafana/dashboard.ts is their source (`pnpm dashboard`).
+apiVersion: 1
+providers:
+  - name: flop-watch
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards

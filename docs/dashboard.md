@@ -1,8 +1,9 @@
 # flop-watch — dashboard spec
 
-Status: proposal, pending owner approval (#33). This is the panel spec of the `flop-watch-overview`
-dashboard of [architecture.md](architecture.md) §8. #14 builds the dashboard from it, and #13
-builds the rules it reads (architecture §7).
+Status: approved (#33, #34), implemented in `grafana/dashboard.ts` (#14). This is the panel spec of
+the `flop-watch-overview` dashboard of [architecture.md](architecture.md) §8, and the rules it
+reads are in architecture §7. A change to a panel updates this file, the generator and the JSON
+(`pnpm dashboard`) in the same PR.
 
 ## 1. Purpose
 
@@ -42,16 +43,17 @@ rows are collapsed, and Grafana runs no query for a collapsed row until a viewer
 - **Colours.** Green is healthy, orange is degraded or a warning threshold, red is down or a
   critical threshold. Blue and grey are neutral information, such as the per-client `ready` flag.
 - **Missing data.** A value series disappears when its source fails (architecture §5). Panels show
-  it as "No data" in grey, never as 0. Time series do not connect points across gaps longer than
-  2 min, so an outage stays visible as a gap.
+  it as "No data" in grey, never as 0. Time series and state timelines break at a missing sample
+  of the query step, at any time range, so an outage stays visible as a gap.
 - **Thresholds** use the numbers of the alerts in architecture §7, on the series each alert reads.
   The yellowpaper thresholds (30 and 120 blocks) are named as such in the description. A few
   panels add an earlier orange step that no alert uses, such as 10 s on the best head age; these
   and the alert thresholds outside the yellowpaper are proposed defaults.
 - **Negative values.** Lags are shown raw, with a line at 0. They can go negative on Devnet
   (research.md §10.2) and against the explorer.
-- **Units.** Seconds `s`; blocks `none` with the suffix ` blocks`; FLOP `none` with the suffix
-  ` FLOP`; requests per second `reqps`. Block numbers show all digits, without SI prefixes.
+- **Units.** Seconds `s`; blocks `none` with the suffix ` blocks`; FLOP amounts `short` (such as
+  "30 Mil") with the axis label "FLOP", because full digits with a suffix crowd the axis; requests
+  per second `reqps`. Block numbers show all digits, without SI prefixes.
 - **Rates.** Rates use `$__rate_interval`. Latency quantiles use a fixed `[5m]` window, because a
   probe adds one observation every 30–60 s and a shorter window would leave gaps; the duration
   buckets (0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10 s) limit their resolution. Bar charts of counts use
@@ -86,6 +88,8 @@ rows are collapsed, and Grafana runs no query for a collapsed row until a viewer
   + 5 * sum by (lane) (flopwatch_faucet_sponsor_status{network="$network", status="other"})
   ```
 
+- **State timelines** use the "fixed" colour mode, grey for unmapped values. With merged values,
+  the "thresholds" mode makes Grafana show threshold ranges instead of the value mappings.
 - **Mobile.** Grafana stacks panels in row order on a narrow screen, so a phone shows the "Now"
   row first. #14 checks the dashboard on a phone before it merges.
 
@@ -95,8 +99,8 @@ Grafana's grid is 24 columns wide; sizes are width × height in grid units.
 
 | Row | State | Panels |
 |---|---|---|
-| (top) | — | About (24×3) |
-| Now | open | 8 stats (3×4 each) |
+| (top) | — | About (24×7, tall enough for the text on a phone) |
+| Now | open | 8 stats in two lines of four (6×4 each), so the titles fit next to the sidebar |
 | Incidents | open | Incidents (24×8); Firing now (12×6), Last successful probe (12×6) |
 | RPC | open | Availability (12×6), Latency (12×6); Failures (8×6), WebSocket reconnects (8×6), Node peers and syncing (8×6) |
 | Blocks and finality | open | Heads now (24×3); Finality lag (12×7), Head age (12×7); Block interval (12×7), Skipped and rewound heads (12×7) |
@@ -109,7 +113,7 @@ Grafana's grid is 24 columns wide; sizes are width × height in grid units.
 
 ### About
 
-- **A1 About** · text, 24×3
+- **A1 About** · text, 24×7
   - Content (Markdown): "Independent, read-only monitor of FLOP Network Devnet and Testnet,
     from a single vantage point. Not affiliated with FLOP Labs. **Measured**: observed by
     flop-watch. **Reported**: stated by a FLOP node or service. **Derived**: computed by a rule
@@ -174,11 +178,15 @@ Each stat shows the latest value of the selected network.
         3 * max by (alertname) (ALERTS{alertstate="firing", severity="critical", network=~"$network|"})
     or  2 * max by (alertname) (ALERTS{alertstate="firing", severity="warning", network=~"$network|"})
     or      max by (alertname) (ALERTS{alertstate="firing", severity="info", network=~"$network|"})
+    or on() label_replace(vector(0) and on() count(up{job="flop-watch"}), "alertname", "No incident", "", "")
     ```
 
   - Display: one row per alert, legend `{{alertname}}`; 3 "critical" red, 2 "warning" orange,
-    1 "info" blue. An empty stretch means the alert was not firing. `network=~"$network|"` keeps
-    `FlopWatchDown`, which has no network label.
+    1 "info" blue. An empty stretch means the alert was not firing. While nothing fires and
+    Prometheus has scrape data, a green "No incident" row shows instead; without it the empty result
+    would render as "Data does not have a time field", and without the `up` condition the row would
+    turn green for times with no data at all. `network=~"$network|"` keeps `FlopWatchDown`, which
+    has no network label.
   - Description: "Derived · Prometheus alert rules over flop-watch's signals. Each alert's
     category (measured, reported, derived) is in the Firing now table."
 - **I2 Firing now** · table, 12×6
@@ -188,8 +196,8 @@ Each stat shows the latest value of the selected network.
     reads."
 - **I3 Last successful probe** · table, 12×6
   - Query (instant): `flopwatch_probe_last_success_timestamp_seconds{network="$network"} * 1000`
-  - Display: columns `target` and the value, unit "From Now" (milliseconds, so the query multiplies
-    by 1000).
+  - Display: columns `target` and the value, unit "From Now" on the value column only (in
+    milliseconds, so the query multiplies by 1000).
   - Description: "Measured · when each probe last succeeded. A target missing here has not
     succeeded since the collector started."
 

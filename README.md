@@ -17,8 +17,9 @@ It keeps the history in Prometheus and shows it in Grafana. Every signal is labe
 > **Status: pre-alpha.** The collector (M1, M2) runs: it watches both networks over WebSocket and
 > HTTP JSON-RPC, probes each faucet's `/limits`, `/health` and `/chain` and the explorer's
 > `/api/stats`, and serves Prometheus metrics. The Docker Compose stack runs the collector with
-> Prometheus, which evaluates the recording rules and alerts, and Grafana; the dashboard (M3) comes
-> next. See the [milestones](https://github.com/tarikcaykara/flop-watch/milestones).
+> Prometheus, which evaluates the recording rules and alerts, and Grafana with the
+> `flop-watch-overview` dashboard. The public instance (M4) comes next. See the
+> [milestones](https://github.com/tarikcaykara/flop-watch/milestones).
 
 flop-watch is a community project. It is not affiliated with or endorsed by FLOP Labs.
 
@@ -40,7 +41,8 @@ docker compose up -d    # Grafana on http://127.0.0.1:3000
 ```
 
 Only Grafana is published, and only on `127.0.0.1`. Grafana takes the admin password from `.env`
-only on its first start; after that, change it in Grafana. The dashboard arrives with M3.
+only on its first start; after that, change it in Grafana. The dashboard opens without a login,
+read-only.
 
 ## Running the collector
 

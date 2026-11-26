@@ -1,0 +1,14 @@
+# The Prometheus of the Compose stack (architecture §8). Panels reference it by its fixed uid.
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      # The scrape interval, so $__rate_interval covers at least four scrapes.
+      timeInterval: 15s
+      httpMethod: POST

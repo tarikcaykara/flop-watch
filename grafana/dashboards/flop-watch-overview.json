@@ -1,0 +1,3963 @@
+{
+	"uid": "flop-watch-overview",
+	"title": "FLOP Network health — flop-watch",
+	"description": "Independent, read-only observability for FLOP Network Devnet and Testnet.",
+	"tags": ["flop", "flop-watch"],
+	"timezone": "utc",
+	"editable": false,
+	"graphTooltip": 1,
+	"refresh": "1m",
+	"schemaVersion": 41,
+	"time": {
+		"from": "now-24h",
+		"to": "now"
+	},
+	"timepicker": {
+		"refresh_intervals": ["30s", "1m", "5m", "15m", "1h"]
+	},
+	"links": [
+		{
+			"title": "flop-watch on GitHub",
+			"type": "link",
+			"url": "https://github.com/tarikcaykara/flop-watch",
+			"targetBlank": true
+		}
+	],
+	"templating": {
+		"list": [
+			{
+				"type": "query",
+				"name": "network",
+				"label": "Network",
+				"datasource": {
+					"type": "prometheus",
+					"uid": "prometheus"
+				},
+				"definition": "label_values(flopwatch_probe_total, network)",
+				"query": {
+					"qryType": 1,
+					"query": "label_values(flopwatch_probe_total, network)",
+					"refId": "PrometheusVariableQueryEditor-VariableQuery"
+				},
+				"refresh": 1,
+				"sort": 1,
+				"multi": false,
+				"includeAll": false,
+				"current": {
+					"selected": true,
+					"text": "testnet",
+					"value": "testnet"
+				},
+				"options": [],
+				"hide": 0
+			}
+		]
+	},
+	"annotations": {
+		"list": [
+			{
+				"name": "Runtime upgrade",
+				"datasource": {
+					"type": "prometheus",
+					"uid": "prometheus"
+				},
+				"enable": true,
+				"iconColor": "blue",
+				"expr": "ALERTS{alertname=\"FlopRuntimeUpgraded\", alertstate=\"firing\", network=\"$network\"}",
+				"step": "60s",
+				"titleFormat": "Runtime upgrade",
+				"textFormat": "The runtime spec version changed."
+			}
+		]
+	},
+	"panels": [
+		{
+			"id": 1,
+			"gridPos": {
+				"h": 7,
+				"w": 24,
+				"x": 0,
+				"y": 0
+			},
+			"type": "text",
+			"title": "About",
+			"options": {
+				"mode": "markdown",
+				"content": "Independent, read-only monitor of FLOP Network Devnet and Testnet, from a single vantage point. Not affiliated with FLOP Labs. **Measured**: observed by flop-watch. **Reported**: stated by a FLOP node or service. **Derived**: computed by a rule from other signals. **Self**: about flop-watch itself. Times are UTC. Source and method: [github.com/tarikcaykara/flop-watch](https://github.com/tarikcaykara/flop-watch)."
+			}
+		},
+		{
+			"id": 2,
+			"type": "row",
+			"title": "Now",
+			"gridPos": {
+				"h": 1,
+				"w": 24,
+				"x": 0,
+				"y": 7
+			},
+			"collapsed": false,
+			"panels": []
+		},
+		{
+			"id": 3,
+			"gridPos": {
+				"h": 4,
+				"w": 6,
+				"x": 0,
+				"y": 8
+			},
+			"type": "stat",
+			"title": "RPC WebSocket",
+			"description": "Measured · `system_health` over flop-watch's RPC WebSocket, every 30 s. Down means the last attempt failed: the health call, the connection, or the setup after connecting.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_probe_success{network=\"$network\", target=\"rpc_ws\"}",
+					"legendFormat": "__auto",
+					"instant": true,
+					"range": false
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "none",
+					"decimals": 0,
+					"noValue": "No data",
+					"mappings": [
+						{
+							"type": "value",
+							"options": {
+								"0": {
+									"text": "Down",
+									"color": "red",
+									"index": 1
+								},
+								"1": {
+									"text": "Up",
+									"color": "green",
+									"index": 0
+								}
+							}
+						}
+					],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "#8e8e8e",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "thresholds"
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"colorMode": "background",
+				"graphMode": "none",
+				"textMode": "value",
+				"justifyMode": "center",
+				"orientation": "auto",
+				"wideLayout": true,
+				"showPercentChange": false
+			}
+		},
+		{
+			"id": 4,
+			"gridPos": {
+				"h": 4,
+				"w": 6,
+				"x": 6,
+				"y": 8
+			},
+			"type": "stat",
+			"title": "RPC HTTP",
+			"description": "Measured · `chain_getHeader` and `system_health` over HTTP JSON-RPC, every 30 s. Down means at least one of the two failed in the last cycle.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_probe_success{network=\"$network\", target=\"rpc_http\"}",
+					"legendFormat": "__auto",
+					"instant": true,
+					"range": false
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "none",
+					"decimals": 0,
+					"noValue": "No data",
+					"mappings": [
+						{
+							"type": "value",
+							"options": {
+								"0": {
+									"text": "Down",
+									"color": "red",
+									"index": 1
+								},
+								"1": {
+									"text": "Up",
+									"color": "green",
+									"index": 0
+								}
+							}
+						}
+					],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "#8e8e8e",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "thresholds"
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"colorMode": "background",
+				"graphMode": "none",
+				"textMode": "value",
+				"justifyMode": "center",
+				"orientation": "auto",
+				"wideLayout": true,
+				"showPercentChange": false
+			}
+		},
+		{
+			"id": 5,
+			"gridPos": {
+				"h": 4,
+				"w": 6,
+				"x": 12,
+				"y": 8
+			},
+			"type": "stat",
+			"title": "Best head age",
+			"description": "Derived · time since flop-watch received the last new-head notification over the WebSocket. Blocks come every second, so over 30 s means no new block reached us.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch:best_head_age_seconds{network=\"$network\"}",
+					"legendFormat": "__auto",
+					"instant": true,
+					"range": false
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "s",
+					"decimals": 0,
+					"noValue": "No data",
+					"mappings": [],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "green",
+								"value": null
+							},
+							{
+								"color": "orange",
+								"value": 10
+							},
+							{
+								"color": "red",
+								"value": 30
+							}
+						]
+					},
+					"color": {
+						"mode": "thresholds"
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"colorMode": "background",
+				"graphMode": "none",
+				"textMode": "value",
+				"justifyMode": "center",
+				"orientation": "auto",
+				"wideLayout": true,
+				"showPercentChange": false
+			}
+		},
+		{
+			"id": 6,
+			"gridPos": {
+				"h": 4,
+				"w": 6,
+				"x": 18,
+				"y": 8
+			},
+			"type": "stat",
+			"title": "Finality lag",
+			"description": "Derived · best minus finalized block number, from the WebSocket subscriptions. 30 and 120 blocks are the yellowpaper's warning and freeze thresholds.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch:finality_lag_blocks{network=\"$network\"}",
+					"legendFormat": "__auto",
+					"instant": true,
+					"range": false
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "suffix: blocks",
+					"decimals": 0,
+					"noValue": "No data",
+					"mappings": [],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "green",
+								"value": null
+							},
+							{
+								"color": "orange",
+								"value": 30
+							},
+							{
+								"color": "red",
+								"value": 120
+							}
+						]
+					},
+					"color": {
+						"mode": "thresholds"
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"colorMode": "background",
+				"graphMode": "none",
+				"textMode": "value",
+				"justifyMode": "center",
+				"orientation": "auto",
+				"wideLayout": true,
+				"showPercentChange": false
+			}
+		},
+		{
+			"id": 7,
+			"gridPos": {
+				"h": 4,
+				"w": 6,
+				"x": 0,
+				"y": 12
+			},
+			"type": "stat",
+			"title": "Faucet claims",
+			"description": "Derived · mirrors the Testnet faucet page's check (research §7): `/chain` and `/limits` fetched, the faucet's genesis matches, `stale` is false and the status is `open`. Not checked: the network names, which the genesis check covers, and the page's agent-lane constants. The page itself checks only on load, so it can stay disabled after this recovers.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch:faucet_claim_ready{network=\"$network\"}",
+					"legendFormat": "__auto",
+					"instant": true,
+					"range": false
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "none",
+					"decimals": 0,
+					"noValue": "No data",
+					"mappings": [
+						{
+							"type": "value",
+							"options": {
+								"0": {
+									"text": "Not ready",
+									"color": "red",
+									"index": 1
+								},
+								"1": {
+									"text": "Ready",
+									"color": "green",
+									"index": 0
+								}
+							}
+						}
+					],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "#8e8e8e",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "thresholds"
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"colorMode": "background",
+				"graphMode": "none",
+				"textMode": "value",
+				"justifyMode": "center",
+				"orientation": "auto",
+				"wideLayout": true,
+				"showPercentChange": false
+			}
+		},
+		{
+			"id": 8,
+			"gridPos": {
+				"h": 4,
+				"w": 6,
+				"x": 6,
+				"y": 12
+			},
+			"type": "stat",
+			"title": "Faucet status",
+			"description": "Reported · `faucet.status` from the faucet's `/limits`, every 60 s.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "sum(flopwatch_faucet_status{network=\"$network\", status=\"open\"})\n+ 2 * sum(flopwatch_faucet_status{network=\"$network\", status=\"low_balance\"})\n+ 3 * sum(flopwatch_faucet_status{network=\"$network\", status=\"unknown\"})\n+ 4 * sum(flopwatch_faucet_status{network=\"$network\", status=\"other\"})",
+					"legendFormat": "__auto",
+					"instant": true,
+					"range": false
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "none",
+					"decimals": 0,
+					"noValue": "No data",
+					"mappings": [
+						{
+							"type": "value",
+							"options": {
+								"1": {
+									"text": "open",
+									"color": "green",
+									"index": 0
+								},
+								"2": {
+									"text": "low_balance",
+									"color": "red",
+									"index": 1
+								},
+								"3": {
+									"text": "unknown",
+									"color": "orange",
+									"index": 2
+								},
+								"4": {
+									"text": "other",
+									"color": "#8e8e8e",
+									"index": 3
+								}
+							}
+						}
+					],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "#8e8e8e",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "thresholds"
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"colorMode": "background",
+				"graphMode": "none",
+				"textMode": "value",
+				"justifyMode": "center",
+				"orientation": "auto",
+				"wideLayout": true,
+				"showPercentChange": false
+			}
+		},
+		{
+			"id": 9,
+			"gridPos": {
+				"h": 4,
+				"w": 6,
+				"x": 12,
+				"y": 12
+			},
+			"type": "stat",
+			"title": "Explorer",
+			"description": "Measured · GET `/api/stats` on the explorer, every 60 s. Down means the request failed or did not return a JSON object.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_probe_success{network=\"$network\", target=\"explorer_stats\"}",
+					"legendFormat": "__auto",
+					"instant": true,
+					"range": false
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "none",
+					"decimals": 0,
+					"noValue": "No data",
+					"mappings": [
+						{
+							"type": "value",
+							"options": {
+								"0": {
+									"text": "Down",
+									"color": "red",
+									"index": 1
+								},
+								"1": {
+									"text": "Up",
+									"color": "green",
+									"index": 0
+								}
+							}
+						}
+					],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "#8e8e8e",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "thresholds"
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"colorMode": "background",
+				"graphMode": "none",
+				"textMode": "value",
+				"justifyMode": "center",
+				"orientation": "auto",
+				"wideLayout": true,
+				"showPercentChange": false
+			}
+		},
+		{
+			"id": 10,
+			"gridPos": {
+				"h": 4,
+				"w": 6,
+				"x": 18,
+				"y": 12
+			},
+			"type": "stat",
+			"title": "Genesis",
+			"description": "Reported · the genesis hash from the RPC WebSocket, RPC HTTP and the faucet, against the pinned one. A mismatch points to a network reset or an endpoint serving another chain; the Identity row shows which source.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "min(flopwatch_genesis_match{network=\"$network\"})",
+					"legendFormat": "__auto",
+					"instant": true,
+					"range": false
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "none",
+					"decimals": 0,
+					"noValue": "No data",
+					"mappings": [
+						{
+							"type": "value",
+							"options": {
+								"0": {
+									"text": "Mismatch",
+									"color": "red",
+									"index": 1
+								},
+								"1": {
+									"text": "Match",
+									"color": "green",
+									"index": 0
+								}
+							}
+						}
+					],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "#8e8e8e",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "thresholds"
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"colorMode": "background",
+				"graphMode": "none",
+				"textMode": "value",
+				"justifyMode": "center",
+				"orientation": "auto",
+				"wideLayout": true,
+				"showPercentChange": false
+			}
+		},
+		{
+			"id": 11,
+			"type": "row",
+			"title": "Incidents",
+			"gridPos": {
+				"h": 1,
+				"w": 24,
+				"x": 0,
+				"y": 16
+			},
+			"collapsed": false,
+			"panels": []
+		},
+		{
+			"id": 12,
+			"gridPos": {
+				"h": 8,
+				"w": 24,
+				"x": 0,
+				"y": 17
+			},
+			"type": "state-timeline",
+			"title": "Incidents",
+			"description": "Derived · Prometheus alert rules over flop-watch's signals. Each alert's category (measured, reported, derived) is in the Firing now table.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "3 * max by (alertname) (ALERTS{alertstate=\"firing\", severity=\"critical\", network=~\"$network|\"})\nor 2 * max by (alertname) (ALERTS{alertstate=\"firing\", severity=\"warning\", network=~\"$network|\"})\nor max by (alertname) (ALERTS{alertstate=\"firing\", severity=\"info\", network=~\"$network|\"})\nor on() label_replace(vector(0) and on() count(up{job=\"flop-watch\"}), \"alertname\", \"No incident\", \"\", \"\")",
+					"legendFormat": "{{alertname}}",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"mappings": [
+						{
+							"type": "value",
+							"options": {
+								"0": {
+									"text": "none",
+									"color": "green",
+									"index": 3
+								},
+								"1": {
+									"text": "info",
+									"color": "blue",
+									"index": 2
+								},
+								"2": {
+									"text": "warning",
+									"color": "orange",
+									"index": 1
+								},
+								"3": {
+									"text": "critical",
+									"color": "red",
+									"index": 0
+								}
+							}
+						}
+					],
+					"color": {
+						"mode": "fixed",
+						"fixedColor": "#8e8e8e"
+					},
+					"custom": {
+						"fillOpacity": 80,
+						"lineWidth": 0,
+						"spanNulls": false
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"mergeValues": true,
+				"showValue": "never",
+				"alignValue": "left",
+				"rowHeight": 0.85,
+				"legend": {
+					"showLegend": false,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 13,
+			"gridPos": {
+				"h": 6,
+				"w": 12,
+				"x": 0,
+				"y": 25
+			},
+			"type": "table",
+			"title": "Firing now",
+			"description": "Derived · the alerts firing now, with the category of the signal each one reads.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "ALERTS{alertstate=\"firing\", network=~\"$network|\"}",
+					"legendFormat": "__auto",
+					"instant": true,
+					"range": false,
+					"format": "table"
+				}
+			],
+			"transformations": [
+				{
+					"id": "filterFieldsByName",
+					"options": {
+						"include": {
+							"names": ["alertname", "severity", "category"]
+						}
+					}
+				},
+				{
+					"id": "organize",
+					"options": {
+						"renameByName": {}
+					}
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "none",
+					"noValue": "No data",
+					"color": {
+						"mode": "thresholds"
+					},
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "#8e8e8e",
+								"value": null
+							}
+						]
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"showHeader": true,
+				"cellHeight": "sm",
+				"footer": {
+					"show": false
+				}
+			}
+		},
+		{
+			"id": 14,
+			"gridPos": {
+				"h": 6,
+				"w": 12,
+				"x": 12,
+				"y": 25
+			},
+			"type": "table",
+			"title": "Last successful probe",
+			"description": "Measured · when each probe last succeeded. A target missing here has not succeeded since the collector started.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_probe_last_success_timestamp_seconds{network=\"$network\"} * 1000",
+					"legendFormat": "__auto",
+					"instant": true,
+					"range": false,
+					"format": "table"
+				}
+			],
+			"transformations": [
+				{
+					"id": "filterFieldsByName",
+					"options": {
+						"include": {
+							"names": ["target", "Value"]
+						}
+					}
+				},
+				{
+					"id": "organize",
+					"options": {
+						"renameByName": {
+							"Value": "last success"
+						}
+					}
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "none",
+					"noValue": "No data",
+					"color": {
+						"mode": "thresholds"
+					},
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "#8e8e8e",
+								"value": null
+							}
+						]
+					}
+				},
+				"overrides": [
+					{
+						"matcher": {
+							"id": "byName",
+							"options": "last success"
+						},
+						"properties": [
+							{
+								"id": "unit",
+								"value": "dateTimeFromNow"
+							}
+						]
+					}
+				]
+			},
+			"options": {
+				"showHeader": true,
+				"cellHeight": "sm",
+				"footer": {
+					"show": false
+				}
+			}
+		},
+		{
+			"id": 15,
+			"type": "row",
+			"title": "RPC",
+			"gridPos": {
+				"h": 1,
+				"w": 24,
+				"x": 0,
+				"y": 31
+			},
+			"collapsed": false,
+			"panels": []
+		},
+		{
+			"id": 16,
+			"gridPos": {
+				"h": 6,
+				"w": 12,
+				"x": 0,
+				"y": 32
+			},
+			"type": "state-timeline",
+			"title": "RPC availability",
+			"description": "Measured · flop-watch's WebSocket connection and its 30 s probes over the WebSocket and HTTP. Gaps mean the collector was not running or Prometheus could not scrape it.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_ws_connected{network=\"$network\"}",
+					"legendFormat": "WebSocket connected",
+					"instant": false,
+					"range": true
+				},
+				{
+					"refId": "B",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_probe_success{network=\"$network\", target=\"rpc_ws\"}",
+					"legendFormat": "WebSocket probe",
+					"instant": false,
+					"range": true
+				},
+				{
+					"refId": "C",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_probe_success{network=\"$network\", target=\"rpc_http\"}",
+					"legendFormat": "HTTP probe",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"mappings": [
+						{
+							"type": "value",
+							"options": {
+								"0": {
+									"text": "Down",
+									"color": "red",
+									"index": 1
+								},
+								"1": {
+									"text": "Up",
+									"color": "green",
+									"index": 0
+								}
+							}
+						}
+					],
+					"color": {
+						"mode": "fixed",
+						"fixedColor": "#8e8e8e"
+					},
+					"custom": {
+						"fillOpacity": 80,
+						"lineWidth": 0,
+						"spanNulls": false
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"mergeValues": true,
+				"showValue": "never",
+				"alignValue": "left",
+				"rowHeight": 0.85,
+				"legend": {
+					"showLegend": false,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 17,
+			"gridPos": {
+				"h": 6,
+				"w": 12,
+				"x": 12,
+				"y": 32
+			},
+			"type": "timeseries",
+			"title": "RPC latency",
+			"description": "Measured · response time of the RPC probes from one vantage point, including our network path and the Cloudflare edge. HTTP includes the genesis check every 10 min.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "histogram_quantile(0.5, sum by (le, target) (rate(flopwatch_probe_duration_seconds_bucket{network=\"$network\", target=~\"rpc_ws|rpc_http\"}[5m])))",
+					"legendFormat": "{{target}} p50",
+					"instant": false,
+					"range": true
+				},
+				{
+					"refId": "B",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "histogram_quantile(0.95, sum by (le, target) (rate(flopwatch_probe_duration_seconds_bucket{network=\"$network\", target=~\"rpc_ws|rpc_http\"}[5m])))",
+					"legendFormat": "{{target}} p95",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "s",
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "transparent",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"drawStyle": "line",
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"fillOpacity": 0,
+						"showPoints": "never",
+						"spanNulls": false,
+						"stacking": {
+							"mode": "none",
+							"group": "A"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"showLegend": true,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 18,
+			"gridPos": {
+				"h": 6,
+				"w": 8,
+				"x": 0,
+				"y": 38
+			},
+			"type": "timeseries",
+			"title": "RPC failures",
+			"description": "Measured · failed RPC requests by result: timeout, network error, HTTP error, JSON-RPC error, invalid response or rate limited.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"interval": "1m",
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "sum by (target, result) (increase(flopwatch_probe_total{network=\"$network\", target=~\"rpc_ws|rpc_http\", result!=\"ok\"}[$__interval]))",
+					"legendFormat": "{{target}} {{result}}",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "none",
+					"decimals": 0,
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "transparent",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"drawStyle": "bars",
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"fillOpacity": 80,
+						"showPoints": "never",
+						"spanNulls": false,
+						"stacking": {
+							"mode": "normal",
+							"group": "A"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"showLegend": true,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 19,
+			"gridPos": {
+				"h": 6,
+				"w": 8,
+				"x": 8,
+				"y": 38
+			},
+			"type": "timeseries",
+			"title": "WebSocket reconnects",
+			"description": "Measured · WebSocket connections opened, and closed by reason: a remote close, an error, or flop-watch's stall watchdog (no new head for 30 s).",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"interval": "1m",
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "sum by (reason) (increase(flopwatch_ws_disconnects_total{network=\"$network\"}[$__interval]))",
+					"legendFormat": "disconnect: {{reason}}",
+					"instant": false,
+					"range": true
+				},
+				{
+					"refId": "B",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "increase(flopwatch_ws_connects_total{network=\"$network\"}[$__interval])",
+					"legendFormat": "connect",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "none",
+					"decimals": 0,
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "transparent",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"drawStyle": "bars",
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"fillOpacity": 80,
+						"showPoints": "never",
+						"spanNulls": false,
+						"stacking": {
+							"mode": "normal",
+							"group": "A"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"showLegend": true,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 20,
+			"gridPos": {
+				"h": 6,
+				"w": 8,
+				"x": 16,
+				"y": 38
+			},
+			"type": "timeseries",
+			"title": "Node peers and syncing",
+			"description": "Reported · peers and the syncing flag from `system_health`, of whichever RPC node behind the load balancer answered. This describes that node, not the network.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_rpc_node_peers{network=\"$network\"}",
+					"legendFormat": "peers ({{transport}})",
+					"instant": false,
+					"range": true
+				},
+				{
+					"refId": "B",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_rpc_node_is_syncing{network=\"$network\"}",
+					"legendFormat": "syncing ({{transport}})",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "none",
+					"decimals": 0,
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "transparent",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"drawStyle": "line",
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"fillOpacity": 0,
+						"showPoints": "never",
+						"spanNulls": false,
+						"stacking": {
+							"mode": "none",
+							"group": "A"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					}
+				},
+				"overrides": [
+					{
+						"matcher": {
+							"id": "byRegexp",
+							"options": "^syncing"
+						},
+						"properties": [
+							{
+								"id": "custom.drawStyle",
+								"value": "bars"
+							},
+							{
+								"id": "custom.axisPlacement",
+								"value": "right"
+							},
+							{
+								"id": "min",
+								"value": 0
+							},
+							{
+								"id": "max",
+								"value": 1
+							}
+						]
+					}
+				]
+			},
+			"options": {
+				"legend": {
+					"showLegend": true,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 21,
+			"type": "row",
+			"title": "Blocks and finality",
+			"gridPos": {
+				"h": 1,
+				"w": 24,
+				"x": 0,
+				"y": 44
+			},
+			"collapsed": false,
+			"panels": []
+		},
+		{
+			"id": 22,
+			"gridPos": {
+				"h": 3,
+				"w": 24,
+				"x": 0,
+				"y": 45
+			},
+			"type": "stat",
+			"title": "Heads now",
+			"description": "Reported · the latest block numbers from the WebSocket subscriptions, `chain_getHeader` over HTTP and the explorer's `/api/stats`.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_chain_best_block_number{network=\"$network\"}",
+					"legendFormat": "Best (WebSocket)",
+					"instant": true,
+					"range": false
+				},
+				{
+					"refId": "B",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_chain_finalized_block_number{network=\"$network\"}",
+					"legendFormat": "Finalized (WebSocket)",
+					"instant": true,
+					"range": false
+				},
+				{
+					"refId": "C",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_rpc_http_best_block_number{network=\"$network\"}",
+					"legendFormat": "Best (HTTP)",
+					"instant": true,
+					"range": false
+				},
+				{
+					"refId": "D",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_explorer_latest_block_number{network=\"$network\"}",
+					"legendFormat": "Explorer latest",
+					"instant": true,
+					"range": false
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "none",
+					"decimals": 0,
+					"noValue": "No data",
+					"mappings": [],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "#8e8e8e",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "thresholds"
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"colorMode": "none",
+				"graphMode": "none",
+				"textMode": "value_and_name",
+				"justifyMode": "center",
+				"orientation": "auto",
+				"wideLayout": true,
+				"showPercentChange": false
+			}
+		},
+		{
+			"id": 23,
+			"gridPos": {
+				"h": 7,
+				"w": 12,
+				"x": 0,
+				"y": 48
+			},
+			"type": "timeseries",
+			"title": "Finality lag",
+			"description": "Derived · best minus finalized block number. 30 and 120 blocks are the yellowpaper's warning and freeze thresholds. Devnet can go negative, probably because its WebSocket streams come from more than one backend.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch:finality_lag_blocks{network=\"$network\"}",
+					"legendFormat": "lag",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "suffix: blocks",
+					"decimals": 0,
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "transparent",
+								"value": null
+							},
+							{
+								"color": "#8e8e8e",
+								"value": 0
+							},
+							{
+								"color": "orange",
+								"value": 30
+							},
+							{
+								"color": "red",
+								"value": 120
+							}
+						]
+					},
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"drawStyle": "line",
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"fillOpacity": 0,
+						"showPoints": "never",
+						"spanNulls": false,
+						"stacking": {
+							"mode": "none",
+							"group": "A"
+						},
+						"thresholdsStyle": {
+							"mode": "line"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"showLegend": true,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 24,
+			"gridPos": {
+				"h": 7,
+				"w": 12,
+				"x": 12,
+				"y": 48
+			},
+			"type": "timeseries",
+			"title": "Head age",
+			"description": "Derived · time since the last new-head and finalized-head notifications reached flop-watch. This reflects delivery to us, not block production.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch:best_head_age_seconds{network=\"$network\"}",
+					"legendFormat": "best",
+					"instant": false,
+					"range": true
+				},
+				{
+					"refId": "B",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch:finalized_head_age_seconds{network=\"$network\"}",
+					"legendFormat": "finalized",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "s",
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "transparent",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"drawStyle": "line",
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"fillOpacity": 0,
+						"showPoints": "never",
+						"spanNulls": false,
+						"stacking": {
+							"mode": "none",
+							"group": "A"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					}
+				},
+				"overrides": [
+					{
+						"matcher": {
+							"id": "byName",
+							"options": "best"
+						},
+						"properties": [
+							{
+								"id": "thresholds",
+								"value": {
+									"mode": "absolute",
+									"steps": [
+										{
+											"color": "transparent",
+											"value": null
+										},
+										{
+											"color": "orange",
+											"value": 30
+										}
+									]
+								}
+							},
+							{
+								"id": "custom.thresholdsStyle",
+								"value": {
+									"mode": "line"
+								}
+							}
+						]
+					},
+					{
+						"matcher": {
+							"id": "byName",
+							"options": "finalized"
+						},
+						"properties": [
+							{
+								"id": "thresholds",
+								"value": {
+									"mode": "absolute",
+									"steps": [
+										{
+											"color": "transparent",
+											"value": null
+										},
+										{
+											"color": "red",
+											"value": 120
+										}
+									]
+								}
+							},
+							{
+								"id": "custom.thresholdsStyle",
+								"value": {
+									"mode": "line"
+								}
+							}
+						]
+					}
+				]
+			},
+			"options": {
+				"legend": {
+					"showLegend": true,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 25,
+			"gridPos": {
+				"h": 7,
+				"w": 12,
+				"x": 0,
+				"y": 55
+			},
+			"type": "heatmap",
+			"title": "Block interval",
+			"description": "Reported · BABE slot delta times slot duration, between consecutive, parent-linked blocks. 1 s is normal; anything higher means empty slots.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"interval": "1m",
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "sum by (le) (increase(flopwatch_chain_block_interval_seconds_bucket{network=\"$network\"}[$__interval]))",
+					"legendFormat": "{{le}}",
+					"instant": false,
+					"range": true,
+					"format": "heatmap"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {},
+				"overrides": []
+			},
+			"options": {
+				"calculate": false,
+				"cellGap": 1,
+				"color": {
+					"mode": "scheme",
+					"scheme": "Oranges",
+					"fill": "orange",
+					"exponent": 0.5,
+					"steps": 64
+				},
+				"yAxis": {
+					"axisPlacement": "left",
+					"unit": "s"
+				},
+				"rowsFrame": {
+					"layout": "auto"
+				},
+				"tooltip": {
+					"mode": "single",
+					"yHistogram": false,
+					"showColorScale": false
+				},
+				"legend": {
+					"show": true
+				},
+				"cellValues": {
+					"decimals": 0
+				}
+			}
+		},
+		{
+			"id": 26,
+			"gridPos": {
+				"h": 7,
+				"w": 12,
+				"x": 12,
+				"y": 55
+			},
+			"type": "timeseries",
+			"title": "Skipped and rewound heads",
+			"description": "Measured · blocks the new-head subscription skipped, and notifications at or below the previous height. Skips are about delivery to us; rewinds can also come from short forks.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"interval": "1m",
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "increase(flopwatch_ws_head_skipped_blocks_total{network=\"$network\"}[$__interval])",
+					"legendFormat": "skipped blocks",
+					"instant": false,
+					"range": true
+				},
+				{
+					"refId": "B",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "increase(flopwatch_ws_head_rewinds_total{network=\"$network\"}[$__interval])",
+					"legendFormat": "rewinds",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "none",
+					"decimals": 0,
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "transparent",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"drawStyle": "bars",
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"fillOpacity": 80,
+						"showPoints": "never",
+						"spanNulls": false,
+						"stacking": {
+							"mode": "normal",
+							"group": "A"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"showLegend": true,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 27,
+			"type": "row",
+			"title": "Faucet",
+			"gridPos": {
+				"h": 1,
+				"w": 24,
+				"x": 0,
+				"y": 62
+			},
+			"collapsed": false,
+			"panels": []
+		},
+		{
+			"id": 28,
+			"gridPos": {
+				"h": 5,
+				"w": 12,
+				"x": 0,
+				"y": 63
+			},
+			"type": "state-timeline",
+			"title": "Claims ready",
+			"description": "Derived · mirrors the Testnet faucet page's check (research §7): `/chain` and `/limits` fetched, the faucet's genesis matches, `stale` is false and the status is `open`. Not checked: the network names, which the genesis check covers, and the page's agent-lane constants. The page itself checks only on load, so it can stay disabled after this recovers.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch:faucet_claim_ready{network=\"$network\"}",
+					"legendFormat": "claims",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"mappings": [
+						{
+							"type": "value",
+							"options": {
+								"0": {
+									"text": "Not ready",
+									"color": "red",
+									"index": 1
+								},
+								"1": {
+									"text": "Ready",
+									"color": "green",
+									"index": 0
+								}
+							}
+						}
+					],
+					"color": {
+						"mode": "fixed",
+						"fixedColor": "#8e8e8e"
+					},
+					"custom": {
+						"fillOpacity": 80,
+						"lineWidth": 0,
+						"spanNulls": false
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"mergeValues": true,
+				"showValue": "never",
+				"alignValue": "left",
+				"rowHeight": 0.85,
+				"legend": {
+					"showLegend": false,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 29,
+			"gridPos": {
+				"h": 5,
+				"w": 12,
+				"x": 12,
+				"y": 63
+			},
+			"type": "state-timeline",
+			"title": "Faucet probes",
+			"description": "Measured · GET `/limits`, `/health` and `/chain` every 60 s. `/health` counts as up on its 503 'degraded' answer too, because that is a valid answer; `/chain` counts as up only with a valid genesis hash.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_probe_success{network=\"$network\", target=~\"faucet_.*\"}",
+					"legendFormat": "{{target}}",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"mappings": [
+						{
+							"type": "value",
+							"options": {
+								"0": {
+									"text": "Down",
+									"color": "red",
+									"index": 1
+								},
+								"1": {
+									"text": "Up",
+									"color": "green",
+									"index": 0
+								}
+							}
+						}
+					],
+					"color": {
+						"mode": "fixed",
+						"fixedColor": "#8e8e8e"
+					},
+					"custom": {
+						"fillOpacity": 80,
+						"lineWidth": 0,
+						"spanNulls": false
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"mergeValues": true,
+				"showValue": "never",
+				"alignValue": "left",
+				"rowHeight": 0.85,
+				"legend": {
+					"showLegend": false,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 30,
+			"gridPos": {
+				"h": 5,
+				"w": 12,
+				"x": 0,
+				"y": 68
+			},
+			"type": "state-timeline",
+			"title": "Status",
+			"description": "Reported · `faucet.status` and `stale` from `/limits`.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "sum(flopwatch_faucet_status{network=\"$network\", status=\"open\"})\n+ 2 * sum(flopwatch_faucet_status{network=\"$network\", status=\"low_balance\"})\n+ 3 * sum(flopwatch_faucet_status{network=\"$network\", status=\"unknown\"})\n+ 4 * sum(flopwatch_faucet_status{network=\"$network\", status=\"other\"})",
+					"legendFormat": "status",
+					"instant": false,
+					"range": true
+				},
+				{
+					"refId": "B",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_faucet_stale{network=\"$network\"}",
+					"legendFormat": "stale",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"mappings": [],
+					"color": {
+						"mode": "fixed",
+						"fixedColor": "#8e8e8e"
+					},
+					"custom": {
+						"fillOpacity": 80,
+						"lineWidth": 0,
+						"spanNulls": false
+					}
+				},
+				"overrides": [
+					{
+						"matcher": {
+							"id": "byName",
+							"options": "status"
+						},
+						"properties": [
+							{
+								"id": "mappings",
+								"value": [
+									{
+										"type": "value",
+										"options": {
+											"1": {
+												"text": "open",
+												"color": "green",
+												"index": 0
+											},
+											"2": {
+												"text": "low_balance",
+												"color": "red",
+												"index": 1
+											},
+											"3": {
+												"text": "unknown",
+												"color": "orange",
+												"index": 2
+											},
+											"4": {
+												"text": "other",
+												"color": "#8e8e8e",
+												"index": 3
+											}
+										}
+									}
+								]
+							}
+						]
+					},
+					{
+						"matcher": {
+							"id": "byName",
+							"options": "stale"
+						},
+						"properties": [
+							{
+								"id": "mappings",
+								"value": [
+									{
+										"type": "value",
+										"options": {
+											"0": {
+												"text": "fresh",
+												"color": "green",
+												"index": 0
+											},
+											"1": {
+												"text": "stale",
+												"color": "red",
+												"index": 1
+											}
+										}
+									}
+								]
+							}
+						]
+					}
+				]
+			},
+			"options": {
+				"mergeValues": true,
+				"showValue": "never",
+				"alignValue": "left",
+				"rowHeight": 0.85,
+				"legend": {
+					"showLegend": false,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 31,
+			"gridPos": {
+				"h": 5,
+				"w": 12,
+				"x": 12,
+				"y": 68
+			},
+			"type": "state-timeline",
+			"title": "Sponsor lanes",
+			"description": "Reported · `sponsor.miner.status` and `sponsor.validator.status` from `/limits`. The official page shows 'Unavailable' for both when its own check fails.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "sum by (lane) (flopwatch_faucet_sponsor_status{network=\"$network\", status=\"open\"})\n+ 2 * sum by (lane) (flopwatch_faucet_sponsor_status{network=\"$network\", status=\"automatic_full\"})\n+ 3 * sum by (lane) (flopwatch_faucet_sponsor_status{network=\"$network\", status=\"positions_full\"})\n+ 4 * sum by (lane) (flopwatch_faucet_sponsor_status{network=\"$network\", status=\"unknown\"})\n+ 5 * sum by (lane) (flopwatch_faucet_sponsor_status{network=\"$network\", status=\"other\"})",
+					"legendFormat": "{{lane}}",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"mappings": [
+						{
+							"type": "value",
+							"options": {
+								"1": {
+									"text": "open",
+									"color": "green",
+									"index": 0
+								},
+								"2": {
+									"text": "automatic_full",
+									"color": "blue",
+									"index": 1
+								},
+								"3": {
+									"text": "positions_full",
+									"color": "orange",
+									"index": 2
+								},
+								"4": {
+									"text": "unknown",
+									"color": "red",
+									"index": 3
+								},
+								"5": {
+									"text": "other",
+									"color": "#8e8e8e",
+									"index": 4
+								}
+							}
+						}
+					],
+					"color": {
+						"mode": "fixed",
+						"fixedColor": "#8e8e8e"
+					},
+					"custom": {
+						"fillOpacity": 80,
+						"lineWidth": 0,
+						"spanNulls": false
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"mergeValues": true,
+				"showValue": "never",
+				"alignValue": "left",
+				"rowHeight": 0.85,
+				"legend": {
+					"showLegend": false,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 32,
+			"gridPos": {
+				"h": 6,
+				"w": 8,
+				"x": 0,
+				"y": 73
+			},
+			"type": "timeseries",
+			"title": "Balance",
+			"description": "Reported · the faucet's balance and its minimum balance, from `/limits`.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_faucet_balance_flop{network=\"$network\"}",
+					"legendFormat": "balance",
+					"instant": false,
+					"range": true
+				},
+				{
+					"refId": "B",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_faucet_min_balance_flop{network=\"$network\"}",
+					"legendFormat": "minimum",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "short",
+					"decimals": 0,
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "transparent",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"drawStyle": "line",
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"fillOpacity": 0,
+						"showPoints": "never",
+						"spanNulls": false,
+						"stacking": {
+							"mode": "none",
+							"group": "A"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						},
+						"axisLabel": "FLOP"
+					}
+				},
+				"overrides": [
+					{
+						"matcher": {
+							"id": "byName",
+							"options": "minimum"
+						},
+						"properties": [
+							{
+								"id": "custom.lineStyle",
+								"value": {
+									"fill": "dash",
+									"dash": [10, 10]
+								}
+							}
+						]
+					}
+				]
+			},
+			"options": {
+				"legend": {
+					"showLegend": true,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 33,
+			"gridPos": {
+				"h": 6,
+				"w": 8,
+				"x": 8,
+				"y": 73
+			},
+			"type": "timeseries",
+			"title": "Daily cap",
+			"description": "Reported · the faucet's daily cap: used, limit and remaining, from `/limits`.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_faucet_daily_cap_used_flop{network=\"$network\"}",
+					"legendFormat": "used",
+					"instant": false,
+					"range": true
+				},
+				{
+					"refId": "B",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_faucet_daily_cap_limit_flop{network=\"$network\"}",
+					"legendFormat": "limit",
+					"instant": false,
+					"range": true
+				},
+				{
+					"refId": "C",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_faucet_daily_cap_remaining_flop{network=\"$network\"}",
+					"legendFormat": "remaining",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "short",
+					"decimals": 0,
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "transparent",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"drawStyle": "line",
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"fillOpacity": 0,
+						"showPoints": "never",
+						"spanNulls": false,
+						"stacking": {
+							"mode": "none",
+							"group": "A"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						},
+						"axisLabel": "FLOP"
+					}
+				},
+				"overrides": [
+					{
+						"matcher": {
+							"id": "byName",
+							"options": "limit"
+						},
+						"properties": [
+							{
+								"id": "custom.lineStyle",
+								"value": {
+									"fill": "dash",
+									"dash": [10, 10]
+								}
+							}
+						]
+					}
+				]
+			},
+			"options": {
+				"legend": {
+					"showLegend": true,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 34,
+			"gridPos": {
+				"h": 6,
+				"w": 8,
+				"x": 16,
+				"y": 73
+			},
+			"type": "timeseries",
+			"title": "Pending grants",
+			"description": "Reported · `faucet.pendingGrants` from `/limits`. A rising count means grants are queued and not yet paid out.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_faucet_pending_grants{network=\"$network\"}",
+					"legendFormat": "pending",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "none",
+					"decimals": 0,
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "transparent",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"drawStyle": "line",
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"fillOpacity": 0,
+						"showPoints": "never",
+						"spanNulls": false,
+						"stacking": {
+							"mode": "none",
+							"group": "A"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"showLegend": true,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 35,
+			"gridPos": {
+				"h": 5,
+				"w": 12,
+				"x": 0,
+				"y": 79
+			},
+			"type": "state-timeline",
+			"title": "/health",
+			"description": "Measured (HTTP status) and reported (ready) · GET `/health`. The faucet scopes `ready` to the client asking, here flop-watch's own address, so it is not global claim readiness; see Claims ready.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_faucet_health_http_status_code{network=\"$network\"}",
+					"legendFormat": "HTTP status",
+					"instant": false,
+					"range": true
+				},
+				{
+					"refId": "B",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_faucet_health_ready{network=\"$network\"}",
+					"legendFormat": "ready (this client)",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"mappings": [],
+					"color": {
+						"mode": "fixed",
+						"fixedColor": "#8e8e8e"
+					},
+					"custom": {
+						"fillOpacity": 80,
+						"lineWidth": 0,
+						"spanNulls": false
+					}
+				},
+				"overrides": [
+					{
+						"matcher": {
+							"id": "byName",
+							"options": "HTTP status"
+						},
+						"properties": [
+							{
+								"id": "mappings",
+								"value": [
+									{
+										"type": "value",
+										"options": {
+											"503": {
+												"text": "503 degraded",
+												"color": "orange",
+												"index": 0
+											}
+										}
+									},
+									{
+										"type": "range",
+										"options": {
+											"from": 200,
+											"to": 299,
+											"result": {
+												"color": "green",
+												"index": 1
+											}
+										}
+									},
+									{
+										"type": "range",
+										"options": {
+											"from": 0,
+											"to": 999,
+											"result": {
+												"color": "red",
+												"index": 2
+											}
+										}
+									}
+								]
+							}
+						]
+					},
+					{
+						"matcher": {
+							"id": "byName",
+							"options": "ready (this client)"
+						},
+						"properties": [
+							{
+								"id": "mappings",
+								"value": [
+									{
+										"type": "value",
+										"options": {
+											"0": {
+												"text": "not ready",
+												"color": "#8e8e8e",
+												"index": 1
+											},
+											"1": {
+												"text": "ready",
+												"color": "blue",
+												"index": 0
+											}
+										}
+									}
+								]
+							}
+						]
+					}
+				]
+			},
+			"options": {
+				"mergeValues": true,
+				"showValue": "never",
+				"alignValue": "left",
+				"rowHeight": 0.85,
+				"legend": {
+					"showLegend": false,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 36,
+			"gridPos": {
+				"h": 5,
+				"w": 12,
+				"x": 12,
+				"y": 79
+			},
+			"type": "state-timeline",
+			"title": "Dependencies",
+			"description": "Reported · `dependencies.<name>.ok` from `/health`. A dependency without an `ok` field, such as `signing`, has no row.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_faucet_dependency_ok{network=\"$network\"}",
+					"legendFormat": "{{dependency}}",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"mappings": [
+						{
+							"type": "value",
+							"options": {
+								"0": {
+									"text": "not ok",
+									"color": "red",
+									"index": 1
+								},
+								"1": {
+									"text": "ok",
+									"color": "green",
+									"index": 0
+								}
+							}
+						}
+					],
+					"color": {
+						"mode": "fixed",
+						"fixedColor": "#8e8e8e"
+					},
+					"custom": {
+						"fillOpacity": 80,
+						"lineWidth": 0,
+						"spanNulls": false
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"mergeValues": true,
+				"showValue": "never",
+				"alignValue": "left",
+				"rowHeight": 0.85,
+				"legend": {
+					"showLegend": false,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 37,
+			"gridPos": {
+				"h": 6,
+				"w": 8,
+				"x": 0,
+				"y": 84
+			},
+			"type": "timeseries",
+			"title": "Indexer lag (faucet)",
+			"description": "Reported · `dependencies.indexer.details.lagBlocks` from `/health`: how far the faucet's indexer is behind its chain head.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_faucet_indexer_lag_blocks{network=\"$network\"}",
+					"legendFormat": "lag",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "suffix: blocks",
+					"decimals": 0,
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "transparent",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"drawStyle": "line",
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"fillOpacity": 0,
+						"showPoints": "never",
+						"spanNulls": false,
+						"stacking": {
+							"mode": "none",
+							"group": "A"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"showLegend": true,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 38,
+			"gridPos": {
+				"h": 6,
+				"w": 8,
+				"x": 8,
+				"y": 84
+			},
+			"type": "timeseries",
+			"title": "/limits data age",
+			"description": "Derived · time since the `asOf` of the last `/limits` answer. It swings between about 0.4 and 5.4 min in normal operation; the alert fires only when it stays over 5 min for 5 min.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch:faucet_limits_age_seconds{network=\"$network\"}",
+					"legendFormat": "age",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "s",
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "transparent",
+								"value": null
+							},
+							{
+								"color": "orange",
+								"value": 300
+							}
+						]
+					},
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"drawStyle": "line",
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"fillOpacity": 0,
+						"showPoints": "never",
+						"spanNulls": false,
+						"stacking": {
+							"mode": "none",
+							"group": "A"
+						},
+						"thresholdsStyle": {
+							"mode": "line"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"showLegend": true,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 39,
+			"gridPos": {
+				"h": 6,
+				"w": 8,
+				"x": 16,
+				"y": 84
+			},
+			"type": "timeseries",
+			"title": "Response time",
+			"description": "Measured · p95 response time of the faucet probes from one vantage point.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "histogram_quantile(0.95, sum by (le, target) (rate(flopwatch_probe_duration_seconds_bucket{network=\"$network\", target=~\"faucet_.*\"}[5m])))",
+					"legendFormat": "{{target}} p95",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "s",
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "transparent",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"drawStyle": "line",
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"fillOpacity": 0,
+						"showPoints": "never",
+						"spanNulls": false,
+						"stacking": {
+							"mode": "none",
+							"group": "A"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"showLegend": true,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 40,
+			"type": "row",
+			"title": "Explorer",
+			"gridPos": {
+				"h": 1,
+				"w": 24,
+				"x": 0,
+				"y": 90
+			},
+			"collapsed": false,
+			"panels": []
+		},
+		{
+			"id": 41,
+			"gridPos": {
+				"h": 6,
+				"w": 8,
+				"x": 0,
+				"y": 91
+			},
+			"type": "state-timeline",
+			"title": "Explorer probe",
+			"description": "Measured · GET `/api/stats` every 60 s, best effort, because the API is undocumented.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_probe_success{network=\"$network\", target=\"explorer_stats\"}",
+					"legendFormat": "explorer",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"mappings": [
+						{
+							"type": "value",
+							"options": {
+								"0": {
+									"text": "Down",
+									"color": "red",
+									"index": 1
+								},
+								"1": {
+									"text": "Up",
+									"color": "green",
+									"index": 0
+								}
+							}
+						}
+					],
+					"color": {
+						"mode": "fixed",
+						"fixedColor": "#8e8e8e"
+					},
+					"custom": {
+						"fillOpacity": 80,
+						"lineWidth": 0,
+						"spanNulls": false
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"mergeValues": true,
+				"showValue": "never",
+				"alignValue": "left",
+				"rowHeight": 0.85,
+				"legend": {
+					"showLegend": false,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 42,
+			"gridPos": {
+				"h": 6,
+				"w": 8,
+				"x": 8,
+				"y": 91
+			},
+			"type": "timeseries",
+			"title": "Indexer lag (explorer)",
+			"description": "Derived · our best block minus the explorer's latest indexed block. It can be slightly negative, because the two sources are read at different moments and may come from different nodes.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch:explorer_indexer_lag_blocks{network=\"$network\"}",
+					"legendFormat": "lag",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "suffix: blocks",
+					"decimals": 0,
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "transparent",
+								"value": null
+							},
+							{
+								"color": "#8e8e8e",
+								"value": 0
+							},
+							{
+								"color": "orange",
+								"value": 120
+							}
+						]
+					},
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"drawStyle": "line",
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"fillOpacity": 0,
+						"showPoints": "never",
+						"spanNulls": false,
+						"stacking": {
+							"mode": "none",
+							"group": "A"
+						},
+						"thresholdsStyle": {
+							"mode": "line"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"showLegend": true,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 43,
+			"gridPos": {
+				"h": 6,
+				"w": 8,
+				"x": 16,
+				"y": 91
+			},
+			"type": "timeseries",
+			"title": "Finality view (explorer)",
+			"description": "Reported · the explorer's own finality lag and `safeMode` flag from `/api/stats`. The explorer reports its own thresholds as 30 (warn) and 120 (freeze) blocks.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "prometheus"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_explorer_finalized_lag_blocks{network=\"$network\"}",
+					"legendFormat": "finalized lag",
+					"instant": false,
+					"range": true
+				},
+				{
+					"refId": "B",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"expr": "flopwatch_explorer_safe_mode{network=\"$network\"}",
+					"legendFormat": "safe mode",
+					"instant": false,
+					"range": true
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "suffix: blocks",
+					"decimals": 0,
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "transparent",
+								"value": null
+							}
+						]
+					},
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"drawStyle": "line",
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"fillOpacity": 0,
+						"showPoints": "never",
+						"spanNulls": false,
+						"stacking": {
+							"mode": "none",
+							"group": "A"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					}
+				},
+				"overrides": [
+					{
+						"matcher": {
+							"id": "byName",
+							"options": "safe mode"
+						},
+						"properties": [
+							{
+								"id": "custom.drawStyle",
+								"value": "bars"
+							},
+							{
+								"id": "custom.axisPlacement",
+								"value": "right"
+							},
+							{
+								"id": "min",
+								"value": 0
+							},
+							{
+								"id": "max",
+								"value": 1
+							},
+							{
+								"id": "unit",
+								"value": "none"
+							}
+						]
+					}
+				]
+			},
+			"options": {
+				"legend": {
+					"showLegend": true,
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi",
+					"sort": "none"
+				}
+			}
+		},
+		{
+			"id": 44,
+			"type": "row",
+			"title": "Identity",
+			"gridPos": {
+				"h": 1,
+				"w": 24,
+				"x": 0,
+				"y": 97
+			},
+			"collapsed": true,
+			"panels": [
+				{
+					"id": 45,
+					"gridPos": {
+						"h": 5,
+						"w": 12,
+						"x": 0,
+						"y": 98
+					},
+					"type": "table",
+					"title": "Chain identity",
+					"description": "Reported · `system_chain`, `state_getRuntimeVersion` and `chain_getBlockHash [0]` over the WebSocket, read on every connect.",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"targets": [
+						{
+							"refId": "A",
+							"datasource": {
+								"type": "prometheus",
+								"uid": "prometheus"
+							},
+							"expr": "flopwatch_chain_info{network=\"$network\"}",
+							"legendFormat": "__auto",
+							"instant": true,
+							"range": false,
+							"format": "table"
+						}
+					],
+					"transformations": [
+						{
+							"id": "filterFieldsByName",
+							"options": {
+								"include": {
+									"names": ["chain", "spec_name", "genesis_hash"]
+								}
+							}
+						},
+						{
+							"id": "organize",
+							"options": {
+								"renameByName": {}
+							}
+						}
+					],
+					"fieldConfig": {
+						"defaults": {
+							"unit": "none",
+							"noValue": "No data",
+							"color": {
+								"mode": "thresholds"
+							},
+							"thresholds": {
+								"mode": "absolute",
+								"steps": [
+									{
+										"color": "#8e8e8e",
+										"value": null
+									}
+								]
+							}
+						},
+						"overrides": []
+					},
+					"options": {
+						"showHeader": true,
+						"cellHeight": "sm",
+						"footer": {
+							"show": false
+						}
+					}
+				},
+				{
+					"id": 46,
+					"gridPos": {
+						"h": 5,
+						"w": 12,
+						"x": 12,
+						"y": 98
+					},
+					"type": "state-timeline",
+					"title": "Genesis match",
+					"description": "Reported · whether each source's genesis hash equals the pinned one: the RPC WebSocket, RPC HTTP (every 10 min) and the faucet's `/chain` (every 60 s).",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"targets": [
+						{
+							"refId": "A",
+							"datasource": {
+								"type": "prometheus",
+								"uid": "prometheus"
+							},
+							"expr": "flopwatch_genesis_match{network=\"$network\"}",
+							"legendFormat": "{{source}}",
+							"instant": false,
+							"range": true
+						}
+					],
+					"fieldConfig": {
+						"defaults": {
+							"mappings": [
+								{
+									"type": "value",
+									"options": {
+										"0": {
+											"text": "mismatch",
+											"color": "red",
+											"index": 1
+										},
+										"1": {
+											"text": "match",
+											"color": "green",
+											"index": 0
+										}
+									}
+								}
+							],
+							"color": {
+								"mode": "fixed",
+								"fixedColor": "#8e8e8e"
+							},
+							"custom": {
+								"fillOpacity": 80,
+								"lineWidth": 0,
+								"spanNulls": false
+							}
+						},
+						"overrides": []
+					},
+					"options": {
+						"mergeValues": true,
+						"showValue": "never",
+						"alignValue": "left",
+						"rowHeight": 0.85,
+						"legend": {
+							"showLegend": false,
+							"displayMode": "list",
+							"placement": "bottom"
+						},
+						"tooltip": {
+							"mode": "multi",
+							"sort": "none"
+						}
+					}
+				},
+				{
+					"id": 47,
+					"gridPos": {
+						"h": 5,
+						"w": 12,
+						"x": 0,
+						"y": 103
+					},
+					"type": "timeseries",
+					"title": "Runtime version",
+					"description": "Reported · the runtime `specVersion` from the runtime-version subscription. Each step is a runtime upgrade, also marked as an annotation.",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"targets": [
+						{
+							"refId": "A",
+							"datasource": {
+								"type": "prometheus",
+								"uid": "prometheus"
+							},
+							"expr": "flopwatch_runtime_spec_version{network=\"$network\"}",
+							"legendFormat": "spec version",
+							"instant": false,
+							"range": true
+						}
+					],
+					"fieldConfig": {
+						"defaults": {
+							"unit": "none",
+							"decimals": 0,
+							"thresholds": {
+								"mode": "absolute",
+								"steps": [
+									{
+										"color": "transparent",
+										"value": null
+									}
+								]
+							},
+							"color": {
+								"mode": "palette-classic"
+							},
+							"custom": {
+								"drawStyle": "line",
+								"lineInterpolation": "stepAfter",
+								"lineWidth": 1,
+								"fillOpacity": 0,
+								"showPoints": "never",
+								"spanNulls": false,
+								"stacking": {
+									"mode": "none",
+									"group": "A"
+								},
+								"thresholdsStyle": {
+									"mode": "off"
+								}
+							}
+						},
+						"overrides": []
+					},
+					"options": {
+						"legend": {
+							"showLegend": true,
+							"displayMode": "list",
+							"placement": "bottom"
+						},
+						"tooltip": {
+							"mode": "multi",
+							"sort": "none"
+						}
+					}
+				},
+				{
+					"id": 48,
+					"gridPos": {
+						"h": 5,
+						"w": 12,
+						"x": 12,
+						"y": 103
+					},
+					"type": "stat",
+					"title": "Slot duration",
+					"description": "Reported · BABE slot duration from `BabeApi_configuration`.",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"targets": [
+						{
+							"refId": "A",
+							"datasource": {
+								"type": "prometheus",
+								"uid": "prometheus"
+							},
+							"expr": "flopwatch_chain_slot_duration_seconds{network=\"$network\"}",
+							"legendFormat": "__auto",
+							"instant": true,
+							"range": false
+						}
+					],
+					"fieldConfig": {
+						"defaults": {
+							"unit": "s",
+							"decimals": 0,
+							"noValue": "No data",
+							"mappings": [],
+							"thresholds": {
+								"mode": "absolute",
+								"steps": [
+									{
+										"color": "#8e8e8e",
+										"value": null
+									}
+								]
+							},
+							"color": {
+								"mode": "thresholds"
+							}
+						},
+						"overrides": []
+					},
+					"options": {
+						"reduceOptions": {
+							"calcs": ["lastNotNull"],
+							"fields": "",
+							"values": false
+						},
+						"colorMode": "background",
+						"graphMode": "none",
+						"textMode": "value",
+						"justifyMode": "center",
+						"orientation": "auto",
+						"wideLayout": true,
+						"showPercentChange": false
+					}
+				}
+			]
+		},
+		{
+			"id": 49,
+			"type": "row",
+			"title": "Collector",
+			"gridPos": {
+				"h": 1,
+				"w": 24,
+				"x": 0,
+				"y": 98
+			},
+			"collapsed": true,
+			"panels": [
+				{
+					"id": 50,
+					"gridPos": {
+						"h": 4,
+						"w": 6,
+						"x": 0,
+						"y": 99
+					},
+					"type": "stat",
+					"title": "Version",
+					"description": "Self · the running flop-watch version.",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"targets": [
+						{
+							"refId": "A",
+							"datasource": {
+								"type": "prometheus",
+								"uid": "prometheus"
+							},
+							"expr": "flopwatch_build_info",
+							"legendFormat": "__auto",
+							"instant": true,
+							"range": false
+						}
+					],
+					"fieldConfig": {
+						"defaults": {
+							"unit": "none",
+							"decimals": 0,
+							"noValue": "No data",
+							"mappings": [],
+							"thresholds": {
+								"mode": "absolute",
+								"steps": [
+									{
+										"color": "#8e8e8e",
+										"value": null
+									}
+								]
+							},
+							"color": {
+								"mode": "thresholds"
+							},
+							"displayName": "${__field.labels.version}"
+						},
+						"overrides": []
+					},
+					"options": {
+						"reduceOptions": {
+							"calcs": ["lastNotNull"],
+							"fields": "",
+							"values": false
+						},
+						"colorMode": "none",
+						"graphMode": "none",
+						"textMode": "name",
+						"justifyMode": "center",
+						"orientation": "auto",
+						"wideLayout": true,
+						"showPercentChange": false
+					}
+				},
+				{
+					"id": 51,
+					"gridPos": {
+						"h": 6,
+						"w": 9,
+						"x": 6,
+						"y": 99
+					},
+					"type": "timeseries",
+					"title": "Requests to FLOP",
+					"description": "Self · flop-watch's steady-state requests to this network's endpoints, against the 0.25 requests/s budget: every probe request, including the WebSocket health pings. Reconnect identity calls and subscriptions are not counted.",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"targets": [
+						{
+							"refId": "A",
+							"datasource": {
+								"type": "prometheus",
+								"uid": "prometheus"
+							},
+							"expr": "sum(rate(flopwatch_probe_total{network=\"$network\"}[10m]))",
+							"legendFormat": "requests",
+							"instant": false,
+							"range": true
+						}
+					],
+					"fieldConfig": {
+						"defaults": {
+							"unit": "reqps",
+							"thresholds": {
+								"mode": "absolute",
+								"steps": [
+									{
+										"color": "transparent",
+										"value": null
+									},
+									{
+										"color": "red",
+										"value": 0.25
+									}
+								]
+							},
+							"color": {
+								"mode": "palette-classic"
+							},
+							"custom": {
+								"drawStyle": "line",
+								"lineInterpolation": "linear",
+								"lineWidth": 1,
+								"fillOpacity": 0,
+								"showPoints": "never",
+								"spanNulls": false,
+								"stacking": {
+									"mode": "none",
+									"group": "A"
+								},
+								"thresholdsStyle": {
+									"mode": "line"
+								}
+							}
+						},
+						"overrides": []
+					},
+					"options": {
+						"legend": {
+							"showLegend": true,
+							"displayMode": "list",
+							"placement": "bottom"
+						},
+						"tooltip": {
+							"mode": "multi",
+							"sort": "none"
+						}
+					}
+				},
+				{
+					"id": 52,
+					"gridPos": {
+						"h": 6,
+						"w": 9,
+						"x": 15,
+						"y": 99
+					},
+					"type": "timeseries",
+					"title": "Memory",
+					"description": "Self · the collector's resident memory. The MVP target is under 150 MB.",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"targets": [
+						{
+							"refId": "A",
+							"datasource": {
+								"type": "prometheus",
+								"uid": "prometheus"
+							},
+							"expr": "process_resident_memory_bytes{job=\"flop-watch\"}",
+							"legendFormat": "resident",
+							"instant": false,
+							"range": true
+						}
+					],
+					"fieldConfig": {
+						"defaults": {
+							"unit": "decbytes",
+							"thresholds": {
+								"mode": "absolute",
+								"steps": [
+									{
+										"color": "transparent",
+										"value": null
+									},
+									{
+										"color": "orange",
+										"value": 150000000
+									}
+								]
+							},
+							"color": {
+								"mode": "palette-classic"
+							},
+							"custom": {
+								"drawStyle": "line",
+								"lineInterpolation": "linear",
+								"lineWidth": 1,
+								"fillOpacity": 0,
+								"showPoints": "never",
+								"spanNulls": false,
+								"stacking": {
+									"mode": "none",
+									"group": "A"
+								},
+								"thresholdsStyle": {
+									"mode": "line"
+								}
+							}
+						},
+						"overrides": []
+					},
+					"options": {
+						"legend": {
+							"showLegend": true,
+							"displayMode": "list",
+							"placement": "bottom"
+						},
+						"tooltip": {
+							"mode": "multi",
+							"sort": "none"
+						}
+					}
+				},
+				{
+					"id": 53,
+					"gridPos": {
+						"h": 6,
+						"w": 24,
+						"x": 0,
+						"y": 105
+					},
+					"type": "table",
+					"title": "Schema mismatches",
+					"description": "Self · remote fields that were missing or had an unexpected type in the selected time range. A FLOP service probably changed its JSON.",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "prometheus"
+					},
+					"targets": [
+						{
+							"refId": "A",
+							"datasource": {
+								"type": "prometheus",
+								"uid": "prometheus"
+							},
+							"expr": "sum by (target, field) (increase(flopwatch_schema_mismatch_total{network=\"$network\"}[$__range])) > 0",
+							"legendFormat": "__auto",
+							"instant": true,
+							"range": false,
+							"format": "table"
+						}
+					],
+					"transformations": [
+						{
+							"id": "filterFieldsByName",
+							"options": {
+								"include": {
+									"names": ["target", "field", "Value"]
+								}
+							}
+						},
+						{
+							"id": "organize",
+							"options": {
+								"renameByName": {
+									"Value": "count"
+								}
+							}
+						}
+					],
+					"fieldConfig": {
+						"defaults": {
+							"unit": "none",
+							"decimals": 0,
+							"noValue": "No data",
+							"color": {
+								"mode": "thresholds"
+							},
+							"thresholds": {
+								"mode": "absolute",
+								"steps": [
+									{
+										"color": "#8e8e8e",
+										"value": null
+									}
+								]
+							}
+						},
+						"overrides": []
+					},
+					"options": {
+						"showHeader": true,
+						"cellHeight": "sm",
+						"footer": {
+							"show": false
+						}
+					}
+				}
+			]
+		}
+	]
+}
