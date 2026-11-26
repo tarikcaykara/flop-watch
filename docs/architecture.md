@@ -63,6 +63,7 @@ functions and closures. [Decision]
 | `src/main.ts` | Load config, start one worker per network, serve `/metrics`, shut down on SIGTERM |
 | `src/config.ts` | Built-in `devnet`/`testnet` profiles, env overrides, validation |
 | `src/rpc-http.ts` | JSON-RPC over HTTP; enforces the method allowlist (§11) |
+| `src/http.ts` | One HTTP request under the transport rules (timeout, no redirects, User-Agent, Retry-After); the GET client of the faucet and explorer probes |
 | `src/chain-watcher.ts` | WS lifecycle: identity calls, subscriptions, health ping, watchdog, backoff, head processing |
 | `src/babe.ts` | Pure decoding: SCALE compact, BABE pre-digest (`variant`, `authorityIndex`, `slot`), `BabeApi_configuration` |
 | `src/blake2b.ts` | Pure BLAKE2b-256 (RFC 7693) and the header hash. **(PoC-driven)** Checking a parent link needs each block's hash. A header notification does not include it, and `node:crypto` offers only `blake2b512` with a fixed output length. The PoC implementation reproduced the node's block hash on both networks. |
@@ -84,9 +85,9 @@ Per network:
      keepalive.
 - **HTTP RPC.** `chain_getHeader` and `system_health` every 30 s; `chain_getBlockHash [0]` every
   10 min.
-- **Faucet.** `/limits`, `/health` **and `/chain`** every 60 s. **(PoC-driven)** The plan had
-  `/chain` every 10 min. The official UI fetches `/chain` on every readiness check, and the Testnet
-  `/chain` returned a transient 503 that is enough to disable claims
+- **Faucet.** `/limits`, `/health` **and `/chain`** every 60 s, each in its own loop. **(PoC-driven)**
+  The plan had `/chain` every 10 min. The official UI fetches `/chain` on every readiness check, and
+  the Testnet `/chain` returned a transient 503 that is enough to disable claims
   ([research.md](research.md) §7). Mirroring the UI requires `/chain` at the same cadence as
   `/limits`.
 - **Explorer.** `/api/stats` every 60 s, best-effort, because the API is undocumented.
@@ -125,13 +126,16 @@ In the PoC every interval was exactly 1 s, so the histogram mainly shows when sl
 
 - **Timeouts.** HTTP requests, WS requests and the WS connect each time out after 10 s.
 - **No retries inside a probe.** A failure is a measurement, and the next cycle is the retry.
-- **Rate limiting.** A 429 is recorded as `result="rate_limited"`. If a 429 or a 503 carries
-  `Retry-After`, that probe's next run is **delayed** until Retry-After has passed, capped at
-  10 min. Probes that share an endpoint (the RPC HTTP head/health and genesis loops) share the
-  pause, and a cycle sends no further request once it has been told to wait.
+- **Rate limiting.** A 429 is recorded as `result="rate_limited"`. If a failed request (a 429 or an
+  error status) carries `Retry-After`, that probe's next run is **delayed** until Retry-After has
+  passed, capped at 10 min. Probes that share an endpoint share the pause: the RPC HTTP head/health
+  and genesis loops, and the three faucet loops. A later, shorter Retry-After never shortens it. A
+  cycle sends no further request once it has been told to wait. A paused probe sends nothing and
+  keeps its last values; for the faucet, the `asOf` age rule (`FlopFaucetLimitsStale`) shows how
+  old they are.
   - **(PoC-driven)** A 503 is **not** recorded as `rate_limited`. The Testnet faucet `/health`
     returns 503 with `Retry-After: 60` as its normal "degraded" answer, which is a valid
-    measurement (see the success rules in §6).
+    measurement (see the success rules in §6), so its Retry-After pauses nothing.
 - **WS reconnect.**
   - Exponential backoff: start at 1 s, double each time, cap at 60 s, with full jitter.
   - The backoff resets after 5 min of stable connection.
@@ -209,9 +213,15 @@ Notes:
   collector, only in rules (§7). Inside a group, single metrics can differ: for example,
   `flopwatch_faucet_health_http_status_code` is measured.
 - **Probe success.**
-  - Faucet `/health` succeeds when parseable JSON comes back, **whatever the HTTP status**: it
-    answers 503 when degraded.
-  - For every other target, success means a 2xx status, parseable JSON and no JSON-RPC error.
+  - Faucet `/health` succeeds when a JSON object comes back with a 2xx or 503 status: it answers
+    503 when degraded. Any other status, a JSON 502 from a proxy included, is a failure.
+    `flopwatch_faucet_health_http_status_code` is set on every response, failures included.
+  - Faucet `/chain` also needs a valid `genesisHash`. Without one the probe is `invalid_response`,
+    as the official UI's check fails too; the mismatch is counted and `genesis_match` keeps its
+    last value.
+  - For every other target, success means a 2xx status, parseable JSON (a JSON object for the
+    faucet and explorer) and no JSON-RPC error. Missing or retyped fields do not fail a faucet or
+    explorer probe; they count as schema mismatches (§5).
   - `rpc_http` success describes the 30 s cycle: `chain_getHeader` and `system_health` both
     succeeded. The 10-min genesis request counts in `probe_total` and `probe_duration_seconds`,
     but not in `probe_success`.
@@ -383,7 +393,8 @@ mirror. [Decision]
 
 - **Read-only by construction.** No keys, no signing, and no POST to the faucet or the gateway.
   Faucet and explorer probes are GET-only, with fixed paths. Redirects are never followed, so no
-  request reaches a host that is not configured; a 3xx is recorded as `http_error`.
+  request reaches a host that is not configured; a 3xx is recorded as `http_error`. A unit test
+  asserts that `src/` contains none of the faucet claim and write paths of hard rule 1.
 - **RPC method allowlist.** Enforced in `rpc-http.ts` and `chain-watcher.ts`; anything else throws
   before a request is sent. It allows:
   - `chain_getBlockHash`, `chain_getHeader`, `chain_getFinalizedHead`;
@@ -404,7 +415,8 @@ mirror. [Decision]
 - **Supply chain.** One runtime dependency, a committed lockfile, images pinned to exact versions,
   and Dependabot or manual updates.
 - **No personal data.** Metrics and logs contain no addresses. The faucet signer address in the
-  `/limits` and `/health` bodies is never exported.
+  `/limits` and `/health` bodies is never exported, and a failed faucet or explorer request logs
+  only the body's `error` string, never the body.
 
 ## 12. Trade-offs and rejected alternatives
 

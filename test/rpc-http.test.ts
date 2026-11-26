@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { after, before, beforeEach, describe, it } from "node:test";
-import { assertAllowed, parseRetryAfter, type RpcOutcome, rpcCall } from "../src/rpc-http.ts";
+import { assertAllowed, rpcCall } from "../src/rpc-http.ts";
+import { failure } from "./helpers.ts";
 
 interface Seen {
 	method: string | undefined;
@@ -38,12 +39,6 @@ beforeEach(() => {
 function reply(status: number, body: string, headers: Record<string, string> = {}): void {
 	respond = (res) =>
 		res.writeHead(status, { "content-type": "application/json", ...headers }).end(body);
-}
-
-function failure(outcome: RpcOutcome) {
-	assert.notEqual(outcome.result, "ok");
-	assert.ok("error" in outcome);
-	return outcome;
 }
 
 describe("rpcCall", () => {
@@ -209,16 +204,5 @@ describe("method allowlist", () => {
 		assert.doesNotThrow(() =>
 			assertAllowed("state_call", ["BabeApi_configuration", "0x", `0x${"ab".repeat(32)}`]),
 		);
-	});
-});
-
-describe("parseRetryAfter", () => {
-	it("reads delta-seconds and HTTP-dates, and ignores anything else", () => {
-		const now = Date.parse("2026-11-25T12:00:00Z");
-		assert.equal(parseRetryAfter("120", now), 120_000);
-		assert.equal(parseRetryAfter("Wed, 25 Nov 2026 12:00:30 GMT", now), 30_000);
-		assert.equal(parseRetryAfter("Wed, 25 Nov 2026 11:00:00 GMT", now), 0);
-		assert.equal(parseRetryAfter("soon", now), null);
-		assert.equal(parseRetryAfter(null, now), null);
 	});
 });

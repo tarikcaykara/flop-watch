@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
 	CHAIN_FIELDS,
@@ -12,42 +11,11 @@ import {
 	parseFaucetLimits,
 	STATS_FIELDS,
 } from "../src/parse.ts";
-
-interface Fixtures {
-	networks: Record<string, Record<string, Record<string, unknown>>>;
-}
-
-const fixtures: Fixtures = JSON.parse(
-	readFileSync(new URL("fixtures/services.json", import.meta.url), "utf8"),
-);
-
-function body(network: "devnet" | "testnet", target: string, status: 200 | 503): unknown {
-	const value = fixtures.networks[network]?.[target]?.[String(status)];
-	assert.ok(value !== undefined, `fixture ${network} ${target} ${status}`);
-	return value;
-}
-
-const REMOVE = Symbol("remove");
-
-/** A deep copy of `source` with the value at the dotted `path` replaced, or removed. */
-function withField(source: unknown, path: string, value: unknown): unknown {
-	const copy = structuredClone(source);
-	const keys = path.split(".");
-	const last = keys.pop();
-	let parent: unknown = copy;
-	for (const key of keys) {
-		assert.ok(typeof parent === "object" && parent !== null, `path ${path}`);
-		parent = Reflect.get(parent, key);
-	}
-	assert.ok(typeof parent === "object" && parent !== null && last !== undefined, `path ${path}`);
-	if (value === REMOVE) Reflect.deleteProperty(parent, last);
-	else Reflect.set(parent, last, value);
-	return copy;
-}
+import { REMOVE, serviceBody, withField } from "./helpers.ts";
 
 describe("recorded fixtures", () => {
 	it("devnet /limits", () => {
-		assert.deepStrictEqual(parseFaucetLimits(body("devnet", "faucet_limits", 200)), {
+		assert.deepStrictEqual(parseFaucetLimits(serviceBody("devnet", "faucet_limits", 200)), {
 			value: {
 				asOfSeconds: Date.parse("2026-11-25T19:00:09.361Z") / 1000,
 				stale: false,
@@ -65,7 +33,7 @@ describe("recorded fixtures", () => {
 	});
 
 	it("testnet /limits", () => {
-		assert.deepStrictEqual(parseFaucetLimits(body("testnet", "faucet_limits", 200)), {
+		assert.deepStrictEqual(parseFaucetLimits(serviceBody("testnet", "faucet_limits", 200)), {
 			value: {
 				asOfSeconds: Date.parse("2026-11-25T18:59:36.401Z") / 1000,
 				stale: false,
@@ -83,7 +51,7 @@ describe("recorded fixtures", () => {
 	});
 
 	it("devnet /health (200)", () => {
-		assert.deepStrictEqual(parseFaucetHealth(body("devnet", "faucet_health", 200)), {
+		assert.deepStrictEqual(parseFaucetHealth(serviceBody("devnet", "faucet_health", 200)), {
 			value: {
 				ready: false,
 				dependencyOk: {
@@ -100,7 +68,7 @@ describe("recorded fixtures", () => {
 	});
 
 	it("testnet /health (503)", () => {
-		assert.deepStrictEqual(parseFaucetHealth(body("testnet", "faucet_health", 503)), {
+		assert.deepStrictEqual(parseFaucetHealth(serviceBody("testnet", "faucet_health", 503)), {
 			value: {
 				ready: false,
 				dependencyOk: {
@@ -117,7 +85,7 @@ describe("recorded fixtures", () => {
 	});
 
 	it("devnet /chain", () => {
-		assert.deepStrictEqual(parseFaucetChain(body("devnet", "faucet_chain", 200)), {
+		assert.deepStrictEqual(parseFaucetChain(serviceBody("devnet", "faucet_chain", 200)), {
 			value: {
 				genesisHash: "0x99c172c095340ace980631f9123544c6bebd4839f3437e463533422d8be2d631",
 			},
@@ -126,7 +94,7 @@ describe("recorded fixtures", () => {
 	});
 
 	it("testnet /chain (200)", () => {
-		assert.deepStrictEqual(parseFaucetChain(body("testnet", "faucet_chain", 200)), {
+		assert.deepStrictEqual(parseFaucetChain(serviceBody("testnet", "faucet_chain", 200)), {
 			value: {
 				genesisHash: "0x918abd58fb16306b30ef3886514cfaebffecb4de43e82b6f8ec4795c43cfd800",
 			},
@@ -135,21 +103,21 @@ describe("recorded fixtures", () => {
 	});
 
 	it("testnet /chain (503 error body)", () => {
-		assert.deepStrictEqual(parseFaucetChain(body("testnet", "faucet_chain", 503)), {
+		assert.deepStrictEqual(parseFaucetChain(serviceBody("testnet", "faucet_chain", 503)), {
 			value: { genesisHash: null },
 			mismatches: ["genesisHash"],
 		});
 	});
 
 	it("devnet /api/stats", () => {
-		assert.deepStrictEqual(parseExplorerStats(body("devnet", "explorer_stats", 200)), {
+		assert.deepStrictEqual(parseExplorerStats(serviceBody("devnet", "explorer_stats", 200)), {
 			value: { latestBlockNumber: 4637408, finalizedLagBlocks: 5, safeMode: false },
 			mismatches: [],
 		});
 	});
 
 	it("testnet /api/stats (503 error body)", () => {
-		assert.deepStrictEqual(parseExplorerStats(body("testnet", "explorer_stats", 503)), {
+		assert.deepStrictEqual(parseExplorerStats(serviceBody("testnet", "explorer_stats", 503)), {
 			value: { latestBlockNumber: null, finalizedLagBlocks: null, safeMode: null },
 			mismatches: [...STATS_FIELDS],
 		});
@@ -202,7 +170,7 @@ const OPTIONAL = new Set([
 
 for (const { name, target, parse, fields } of PARSERS) {
 	describe(`${name}: removed or retyped fields`, () => {
-		const source = body("devnet", target, 200);
+		const source = serviceBody("devnet", target, 200);
 		for (const field of fields) {
 			it(`${field} retyped to [] is a mismatch`, () => {
 				assert.deepStrictEqual(parse(withField(source, field, [])).mismatches, [field]);
@@ -217,7 +185,7 @@ for (const { name, target, parse, fields } of PARSERS) {
 }
 
 describe("parseFaucetHealth: dependencies", () => {
-	const source = body("devnet", "faucet_health", 200);
+	const source = serviceBody("devnet", "faucet_health", 200);
 	const noDependencies = {
 		ready: false,
 		dependencyOk: {
@@ -242,7 +210,7 @@ describe("parseFaucetHealth: dependencies", () => {
 	it("signing without ok gives no value and no mismatch", () => {
 		assert.equal(parseFaucetHealth(source).value.dependencyOk.signing, null);
 		assert.equal(
-			parseFaucetHealth(body("testnet", "faucet_health", 503)).value.dependencyOk.signing,
+			parseFaucetHealth(serviceBody("testnet", "faucet_health", 503)).value.dependencyOk.signing,
 			null,
 		);
 	});
@@ -290,7 +258,7 @@ describe("parseFaucetHealth: dependencies", () => {
 });
 
 describe("parseFaucetLimits: enums", () => {
-	const source = body("devnet", "faucet_limits", 200);
+	const source = serviceBody("devnet", "faucet_limits", 200);
 
 	for (const [status, expected] of [
 		["unknown", "unknown"],
@@ -338,7 +306,7 @@ describe("parseFaucetLimits: enums", () => {
 });
 
 describe("parseFaucetLimits: amounts and time", () => {
-	const source = body("devnet", "faucet_limits", 200);
+	const source = serviceBody("devnet", "faucet_limits", 200);
 
 	it("a fractional FLOP string becomes a number", () => {
 		const parsed = parseFaucetLimits(withField(source, "faucet.balanceFlop", "12.5"));
@@ -379,7 +347,7 @@ describe("parseFaucetLimits: amounts and time", () => {
 
 describe("parseExplorerStats: numbers", () => {
 	it("a non-finite number is a mismatch", () => {
-		const source = body("devnet", "explorer_stats", 200);
+		const source = serviceBody("devnet", "explorer_stats", 200);
 		for (const n of [Number.POSITIVE_INFINITY, Number.NaN]) {
 			const parsed = parseExplorerStats(withField(source, "latestBlockNumber", n));
 			assert.equal(parsed.value.latestBlockNumber, null);
@@ -390,7 +358,7 @@ describe("parseExplorerStats: numbers", () => {
 
 describe("parseFaucetChain: genesis hash", () => {
 	it("an upper-case or short hash is a mismatch", () => {
-		const source = body("devnet", "faucet_chain", 200);
+		const source = serviceBody("devnet", "faucet_chain", 200);
 		for (const hash of [`0x${"AB".repeat(32)}`, "0x99c1"]) {
 			assert.deepStrictEqual(parseFaucetChain(withField(source, "genesisHash", hash)), {
 				value: { genesisHash: null },

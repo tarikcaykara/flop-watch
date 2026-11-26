@@ -12,9 +12,10 @@ import {
 import { headerHash } from "./blake2b.ts";
 import { realSchedule, type Schedule } from "./clock.ts";
 import type { NetworkConfig } from "./config.ts";
+import { REQUEST_TIMEOUT_MS } from "./http.ts";
 import type { Logger } from "./log.ts";
 import type { DisconnectReason, Metrics, ProbeResult } from "./metrics.ts";
-import { assertAllowed, REQUEST_TIMEOUT_MS } from "./rpc-http.ts";
+import { assertAllowed } from "./rpc-http.ts";
 import { USER_AGENT } from "./version.ts";
 
 export const WATCHDOG_MS = 30_000;

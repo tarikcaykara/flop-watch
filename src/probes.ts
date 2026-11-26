@@ -1,17 +1,37 @@
-// Scheduled HTTP probes (architecture §4, §5): a loop per probe with first-run jitter, no
-// overlapping runs and Retry-After back-off, and the HTTP JSON-RPC probes of one network.
+// Scheduled HTTP probes (architecture §4, §5, §6): a loop per probe with first-run jitter, no
+// overlapping runs and Retry-After back-off; the HTTP JSON-RPC probes and the faucet probes of one
+// network.
 
+import type { Gauge } from "@prometheus-io/client";
 import { isRpcHeader, parseBlockNumber } from "./babe.ts";
 import { realSchedule, type Schedule } from "./clock.ts";
 import type { NetworkConfig } from "./config.ts";
+import { getJson, type HttpOutcome } from "./http.ts";
 import type { Logger } from "./log.ts";
-import type { Metrics, ProbeResult } from "./metrics.ts";
-import { type RpcOutcome, rpcCall } from "./rpc-http.ts";
+import {
+	FAUCET_DEPENDENCIES,
+	FAUCET_STATUSES,
+	type Metrics,
+	type ProbeResult,
+	SPONSOR_LANES,
+	SPONSOR_STATUSES,
+	type Target,
+} from "./metrics.ts";
+import {
+	type ChainField,
+	type HealthField,
+	type LimitsField,
+	parseFaucetChain,
+	parseFaucetHealth,
+	parseFaucetLimits,
+} from "./parse.ts";
+import { rpcCall } from "./rpc-http.ts";
 
 export const FIRST_RUN_JITTER_MS = 5_000;
 export const RETRY_AFTER_CAP_MS = 10 * 60_000;
 export const RPC_HTTP_INTERVAL_MS = 30_000;
 export const GENESIS_INTERVAL_MS = 10 * 60_000;
+export const FAUCET_INTERVAL_MS = 60_000;
 const GENESIS_RE = /^0x[0-9a-f]{64}$/;
 
 export interface ProbeLoop {
@@ -71,6 +91,28 @@ export function startLoop(
 	};
 }
 
+/**
+ * One Retry-After pause for the loops that hit the same host. While it lasts, a wrapped run sends
+ * nothing and returns the remaining wait; a run that returns a Retry-After extends it, never
+ * shortens it.
+ */
+function sharedPause(now: () => number) {
+	let pausedUntil = 0;
+	return (run: () => Promise<number | null>) => async (): Promise<number | null> => {
+		const wait = pausedUntil - now();
+		if (wait > 0) return wait;
+		const retry = await run();
+		if (retry !== null) {
+			pausedUntil = Math.max(pausedUntil, now() + Math.min(retry, RETRY_AFTER_CAP_MS));
+		}
+		return retry;
+	};
+}
+
+/** A failure's Retry-After; a valid answer never pauses anything. */
+const retryAfter = (outcome: HttpOutcome) =>
+	outcome.result === "ok" ? null : outcome.retryAfterMs;
+
 /** Remote fields the HTTP RPC probes can report in flopwatch_schema_mismatch_total. */
 type RpcHttpField = "header" | "health" | "genesis";
 
@@ -83,17 +125,16 @@ export function startHttpRpcProbes(
 	options: { network: NetworkConfig; metrics: Metrics } & LoopOptions,
 ): ProbeLoop {
 	const { network, metrics, log } = options;
-	const now = options.now ?? (() => performance.now());
+	const paced = sharedPause(options.now ?? (() => performance.now()));
 	const byNetwork = { network: network.name };
 	const target = { network: network.name, target: "rpc_http" } as const;
 	const httpTransport = { network: network.name, transport: "http" } as const;
 	let stopped = false;
-	let pausedUntil = 0;
 
 	/** Records one request; `valid` is false when an ok answer had the wrong shape. */
 	const record = (
 		method: string,
-		outcome: RpcOutcome,
+		outcome: HttpOutcome,
 		valid: boolean,
 		field: RpcHttpField,
 	): ProbeResult => {
@@ -113,17 +154,6 @@ export function startHttpRpcProbes(
 			});
 		}
 		return result;
-	};
-	const retryAfter = (outcome: RpcOutcome) =>
-		outcome.result === "ok" ? null : outcome.retryAfterMs;
-
-	/** Runs `run` unless the endpoint asked us to wait; a Retry-After pauses both loops. */
-	const paced = (run: () => Promise<number | null>) => async (): Promise<number | null> => {
-		const wait = pausedUntil - now();
-		if (wait > 0) return wait;
-		const retry = await run();
-		if (retry !== null) pausedUntil = now() + Math.min(retry, RETRY_AFTER_CAP_MS);
-		return retry;
 	};
 
 	const headAndHealth = async (): Promise<number | null> => {
@@ -210,6 +240,143 @@ export function startHttpRpcProbes(
 	const loops = [
 		startLoop(`${network.name} rpc_http`, RPC_HTTP_INTERVAL_MS, paced(headAndHealth), options),
 		startLoop(`${network.name} genesis`, GENESIS_INTERVAL_MS, paced(genesis), options),
+	];
+	return {
+		stop: async () => {
+			stopped = true;
+			await Promise.all(loops.map((loop) => loop.stop()));
+		},
+	};
+}
+
+/** Faucet /health answers 503 with its usual JSON body when degraded (architecture §6). */
+const isHealthAnswer = (status: number) => (status >= 200 && status < 300) || status === 503;
+
+/**
+ * The faucet probes of one network (architecture §4, §6): GET /limits, /health and /chain, each in
+ * its own loop every 60 s. The three share one Retry-After pause, because they hit the same host.
+ * Values come from the tolerant parsers: a missing or retyped field drops its series and counts in
+ * flopwatch_schema_mismatch_total, and a failed request drops every value series of its target.
+ */
+export function startFaucetProbes(
+	options: { network: NetworkConfig; faucetUrl: string; metrics: Metrics } & LoopOptions,
+): ProbeLoop {
+	const { network, faucetUrl, metrics, log } = options;
+	const paced = sharedPause(options.now ?? (() => performance.now()));
+	const byNetwork = { network: network.name };
+	let stopped = false;
+
+	/** Records one request of `target`, with the allowlisted fields its body lacked. */
+	const record = (
+		target: Target,
+		outcome: HttpOutcome,
+		mismatches: readonly (LimitsField | HealthField | ChainField)[],
+	) => {
+		const labels = { ...byNetwork, target };
+		metrics.probeTotal.inc({ ...labels, result: outcome.result });
+		metrics.probeDuration.observe(labels, outcome.ms / 1000);
+		for (const field of mismatches) metrics.schemaMismatch.inc({ ...labels, field });
+		metrics.probeSuccess.set(labels, outcome.result === "ok" ? 1 : 0);
+		if (outcome.result === "ok") {
+			metrics.probeLastSuccess.set(labels, Date.now() / 1000);
+		} else {
+			log.warn("faucet request failed", {
+				network: network.name,
+				target,
+				result: outcome.result,
+				error: outcome.error,
+			});
+		}
+	};
+	/** Sets a per-network value, or removes its series while the value is unknown. */
+	const put = (gauge: Gauge<"network">, value: number | boolean | null) => {
+		if (value === null) gauge.remove(byNetwork);
+		else gauge.set(byNetwork, Number(value));
+	};
+
+	const limits = async (): Promise<number | null> => {
+		const outcome = await getJson(`${faucetUrl}/limits`);
+		if (stopped) return null;
+		const parsed = outcome.result === "ok" ? parseFaucetLimits(outcome.value) : null;
+		record("faucet_limits", outcome, parsed?.mismatches ?? []);
+		const v = parsed?.value;
+		const current = v?.status ?? null;
+		for (const status of FAUCET_STATUSES) {
+			const labels = { ...byNetwork, status };
+			if (current === null) metrics.faucetStatus.remove(labels);
+			else metrics.faucetStatus.set(labels, status === current ? 1 : 0);
+		}
+		put(metrics.faucetStale, v?.stale ?? null);
+		put(metrics.faucetLimitsAsOf, v?.asOfSeconds ?? null);
+		put(metrics.faucetBalance, v?.balanceFlop ?? null);
+		put(metrics.faucetMinBalance, v?.minBalanceFlop ?? null);
+		put(metrics.faucetDailyCapLimit, v?.dailyCapLimitFlop ?? null);
+		put(metrics.faucetDailyCapUsed, v?.dailyCapUsedFlop ?? null);
+		put(metrics.faucetDailyCapRemaining, v?.dailyCapRemainingFlop ?? null);
+		put(metrics.faucetPendingGrants, v?.pendingGrants ?? null);
+		for (const lane of SPONSOR_LANES) {
+			const laneStatus = v?.sponsorStatus[lane] ?? null;
+			for (const status of SPONSOR_STATUSES) {
+				const labels = { ...byNetwork, lane, status };
+				if (laneStatus === null) metrics.faucetSponsorStatus.remove(labels);
+				else metrics.faucetSponsorStatus.set(labels, status === laneStatus ? 1 : 0);
+			}
+		}
+		return retryAfter(outcome);
+	};
+
+	/** The status code is measured on every response, including failures. */
+	const health = async (): Promise<number | null> => {
+		const outcome = await getJson(`${faucetUrl}/health`, { accept: isHealthAnswer });
+		if (stopped) return null;
+		const parsed = outcome.result === "ok" ? parseFaucetHealth(outcome.value) : null;
+		record("faucet_health", outcome, parsed?.mismatches ?? []);
+		put(metrics.faucetHealthStatusCode, outcome.httpStatus);
+		const v = parsed?.value;
+		put(metrics.faucetHealthReady, v?.ready ?? null);
+		for (const dependency of FAUCET_DEPENDENCIES) {
+			const labels = { ...byNetwork, dependency };
+			const ok = v?.dependencyOk[dependency] ?? null;
+			if (ok === null) metrics.faucetDependencyOk.remove(labels);
+			else metrics.faucetDependencyOk.set(labels, ok ? 1 : 0);
+		}
+		put(metrics.faucetIndexerLag, v?.indexerLagBlocks ?? null);
+		return retryAfter(outcome);
+	};
+
+	/**
+	 * The genesis is why /chain is read: without a valid one the probe fails, as the official UI's
+	 * check does. genesis_match is identity, kept until the next successful check (architecture §5).
+	 */
+	const chain = async (): Promise<number | null> => {
+		const fetched = await getJson(`${faucetUrl}/chain`);
+		if (stopped) return null;
+		const parsed = fetched.result === "ok" ? parseFaucetChain(fetched.value) : null;
+		const hash = parsed?.value.genesisHash ?? null;
+		const outcome: HttpOutcome =
+			fetched.result === "ok" && hash === null
+				? {
+						result: "invalid_response",
+						error: "no valid genesisHash",
+						ms: fetched.ms,
+						httpStatus: fetched.httpStatus,
+						retryAfterMs: null,
+					}
+				: fetched;
+		record("faucet_chain", outcome, parsed?.mismatches ?? []);
+		if (hash !== null) {
+			metrics.genesisMatch.set(
+				{ ...byNetwork, source: "faucet" },
+				hash === network.expectedGenesis ? 1 : 0,
+			);
+		}
+		return retryAfter(outcome);
+	};
+
+	const loops = [
+		startLoop(`${network.name} faucet_limits`, FAUCET_INTERVAL_MS, paced(limits), options),
+		startLoop(`${network.name} faucet_health`, FAUCET_INTERVAL_MS, paced(health), options),
+		startLoop(`${network.name} faucet_chain`, FAUCET_INTERVAL_MS, paced(chain), options),
 	];
 	return {
 		stop: async () => {
