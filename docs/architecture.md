@@ -152,6 +152,10 @@ In the PoC every interval was exactly 1 s, so the histogram mainly shows when sl
   - If a field is missing or has the wrong type, skip that metric and increment
     `flopwatch_schema_mismatch_total{network,target,field}`. The `field` label comes from a fixed
     allowlist of the fields we read.
+  - For the faucet and explorer targets, `field` is the dotted JSON path
+    (`faucet.dailyCap.usedFlop`); the allowlists live in `src/parse.ts`. `/health`
+    `dependencies.<name>.ok` and `dependencies.indexer.details.lagBlocks` are optional: missing or
+    null leaves the series absent and counts no mismatch.
   - Unknown enum values map to `other`.
   - The process never crashes on remote data.
 - **Runtime upgrades.** Nothing to handle beyond updating the gauge. We decode only two `u64` values

@@ -36,7 +36,11 @@ export const GENESIS_SOURCES = ["rpc_ws", "rpc_http", "faucet"] as const;
 export type GenesisSource = (typeof GENESIS_SOURCES)[number];
 
 export const FAUCET_STATUSES = ["open", "low_balance", "unknown", "other"] as const;
+export type FaucetStatus = (typeof FAUCET_STATUSES)[number];
+
 export const SPONSOR_LANES = ["miner", "validator"] as const;
+export type SponsorLane = (typeof SPONSOR_LANES)[number];
+
 export const SPONSOR_STATUSES = [
 	"open",
 	"automatic_full",
@@ -44,6 +48,8 @@ export const SPONSOR_STATUSES = [
 	"unknown",
 	"other",
 ] as const;
+export type SponsorStatus = (typeof SPONSOR_STATUSES)[number];
+
 export const FAUCET_DEPENDENCIES = [
 	"signer",
 	"indexer",
@@ -51,6 +57,7 @@ export const FAUCET_DEPENDENCIES = [
 	"funding",
 	"signing",
 ] as const;
+export type FaucetDependency = (typeof FAUCET_DEPENDENCIES)[number];
 
 /** The only label names allowed (hard rule 4); the type keeps any other name from compiling. */
 type LabelName =

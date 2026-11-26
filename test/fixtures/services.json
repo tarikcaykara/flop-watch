@@ -1,0 +1,446 @@
+{
+	"recordedAt": "2026-11-25T19:00:13.625Z",
+	"recheckedAt": "2026-11-25T19:13:39.283Z",
+	"networks": {
+		"devnet": {
+			"faucet_chain": {
+				"200": {
+					"network": "devnet",
+					"chain": "FLOP Devnet",
+					"genesisHash": "0x99c172c095340ace980631f9123544c6bebd4839f3437e463533422d8be2d631",
+					"caip2": "polkadot:99c172c095340ace980631f9123544c6",
+					"ss58Format": 42,
+					"decimals": 18,
+					"tokenSymbol": "FLOP",
+					"rpc": "wss://rpc.devnet.flop.network",
+					"walletConnect": false,
+					"technocoreBot": {
+						"did": "did:key:z6MknvDjo8TQVcqQcG9THtp5Ga33cX4B3yT7s1s2t9XQnsk3",
+						"room": "flop-devnet-faucet"
+					}
+				}
+			},
+			"faucet_limits": {
+				"200": {
+					"network": "devnet",
+					"faucet": {
+						"status": "open",
+						"signer": "5DZsAQuavUAM7A6XvoTkDQgtQdRCMcALdUd6Bx4FSoFMF8ux",
+						"balanceFlop": "30482522",
+						"minBalanceFlop": "10000000",
+						"dailyCap": {
+							"limitFlop": "10000000",
+							"usedFlop": "3323710",
+							"remainingFlop": "6676290"
+						},
+						"pendingGrants": 0,
+						"anonymous": {
+							"grantFlop": 25,
+							"addressCooldownSeconds": 86400
+						},
+						"linked": {
+							"baseFlop": 500,
+							"perGrantCapFlop": 2000,
+							"rolling7DayCapFlop": 2000,
+							"identityCooldownSeconds": 86400
+						},
+						"agent": {
+							"grantFlop": 2,
+							"cooldownSeconds": 86400,
+							"rolloverRequiresSpend": true
+						},
+						"perClient": {
+							"ipGrantsPerDay": 300,
+							"ipRangeGrantsPerDay": 10000,
+							"ipCooldownSeconds": 10
+						}
+					},
+					"sponsor": {
+						"miner": {
+							"status": "positions_full",
+							"signer": "5D4n9S1zU4XgRD2MGUR7rN2MAJyfM2DWAhgw9dVGUNr4moh7",
+							"spendableFlop": "409146034",
+							"capacity": {
+								"signers": 16,
+								"used": 1024,
+								"max": 1024,
+								"active": 751,
+								"unbonding": 273,
+								"other": 0
+							},
+							"dailyNewSponsorships": {
+								"used": 0,
+								"limit": 1000
+							},
+							"dailyStakeBudget": {
+								"limitFlop": "40000000",
+								"usedFlop": "0"
+							},
+							"automatic": {
+								"open": true,
+								"uncalibrated": 0,
+								"max": 200,
+								"graceHours": 4
+							}
+						},
+						"validator": {
+							"status": "open",
+							"signer": "5Cf1YSXb1zyUPqwEfZJPmQAYXqktkcf8nVVdHJZ2NyvVPRvv",
+							"spendableFlop": "553679499",
+							"capacity": {
+								"signers": 4,
+								"used": 1,
+								"max": 256,
+								"active": 1,
+								"unbonding": 0,
+								"other": 0
+							},
+							"dailyNewSponsorships": {
+								"used": 0,
+								"limit": 100
+							},
+							"dailyStakeBudget": {
+								"limitFlop": "150000000",
+								"usedFlop": "0"
+							},
+							"automatic": {
+								"open": true,
+								"sponsored": 1,
+								"unsponsoredActive": 13
+							}
+						}
+					},
+					"asOf": "2026-11-25T19:00:09.361Z",
+					"stale": false
+				}
+			},
+			"faucet_health": {
+				"200": {
+					"status": "degraded",
+					"signer": "5DZsAQuavUAM7A6XvoTkDQgtQdRCMcALdUd6Bx4FSoFMF8ux",
+					"connected": true,
+					"freeBalanceRaw": "30482522635647385987606367",
+					"minBalanceRaw": "10000000000000000000000000",
+					"decimals": 18,
+					"trustProxy": ["uniquelocal"],
+					"limits": {
+						"ipCooldownMs": 10000,
+						"ipGrantsPerDay": 300,
+						"ipPrefixGrantsPerDay": 10000,
+						"addressCooldownMs": 86400000,
+						"identityCooldownMs": 86400000,
+						"dailyCapFlop": 10000000,
+						"dailyCapExemptionConfigured": true
+					},
+					"image": {
+						"version": "0.1.417",
+						"revision": "c2ccc69015e68b976b8cc16f0adcc6c6b7bafa19"
+					},
+					"live": true,
+					"ready": false,
+					"readinessScope": "dependencies and estimated funding capacity for this client; grant eligibility checked on request",
+					"dependencies": {
+						"signer": {
+							"ok": true
+						},
+						"indexer": {
+							"ok": true,
+							"details": {
+								"indexedHead": 4637415,
+								"chainHead": 4637417,
+								"lagBlocks": 2,
+								"lastProgressAt": 1795633214431,
+								"lastHeadAt": 1795633214282,
+								"binding": {
+									"genesis": "0x99c172c095340ace980631f9123544c6bebd4839f3437e463533422d8be2d631",
+									"dataGeneration": "83e802ce-9977-4c3b-a041-2c1d3a0756a1",
+									"writerGeneration": "412"
+								},
+								"head": 4637415,
+								"validUntil": 1795633512000
+							}
+						},
+						"ip_classification": {
+							"ok": true,
+							"details": {
+								"exempt": true
+							}
+						},
+						"funding": {
+							"ok": false,
+							"asOf": "2026-11-25T19:00:09.361Z",
+							"stale": false,
+							"faucet": {
+								"status": "open"
+							},
+							"sponsor": {
+								"miner": {
+									"status": "positions_full"
+								},
+								"validator": {
+									"status": "open"
+								}
+							}
+						},
+						"signing": {
+							"held": false,
+							"reason": null,
+							"sinceSeconds": null
+						}
+					}
+				}
+			},
+			"explorer_stats": {
+				"200": {
+					"latestBlockNumber": 4637408,
+					"totalBlocks": 4637408,
+					"tps": 2.43,
+					"activeHTLCs": 9796,
+					"totalHTLCs": 9917,
+					"proofs24h": 0,
+					"activeOperators": 0,
+					"avgBlockTime": 999.9473684210526,
+					"totalTransactions": 14303288,
+					"txVolume24h": 1125931,
+					"totalAccounts": 104788,
+					"flopLocked": "2131830153119300000086",
+					"expiredHTLCs": 9768,
+					"registeredMiners": 759,
+					"activeValidators": 13,
+					"activeAgents": 19225,
+					"totalSupply": "4418965101752572826167188450",
+					"finality": {
+						"bestBlock": 4637414,
+						"finalizedBlock": 4637409,
+						"finalizedLag": 5,
+						"state": "normal",
+						"safeMode": false,
+						"thresholds": {
+							"warnBlocks": 30,
+							"freezeBlocks": 120,
+							"maxStallBlocks": 3600
+						},
+						"affectedActions": [],
+						"foreignTimeoutMargin": {
+							"recommendedMinimumMarginBlocks": 3605,
+							"warning": "Foreign-chain HTLC clocks keep running; BTC/NEAR/Solana deadlines cannot be frozen by FLOP finality safe mode."
+						}
+					},
+					"protocolAccounts": {
+						"status": "available",
+						"finalizedHash": "0xea5ef264f559bf044bc70bd30cfba019d6b1c1ba4e167f5a26b02d5bae49ead6",
+						"finalizedBlock": 4637409,
+						"subsidyActive": true,
+						"subsidyEndBlock": 315360000,
+						"labs": {
+							"address": "5ED9j9foJCyT6qysBsAcdviB8oWPzEw3wpQd2DhKFu73t2JW",
+							"totalBalance": "37099143922086349575000000",
+							"totalSubsidy": "37099272000000000000000000",
+							"blockSubsidy": "8000000000000000000"
+						},
+						"foundation": {
+							"address": "5EfE37TpzwYSbgHHrr9SqGA3Hf5mdTv9QyTVWe4xP6XGH5NM",
+							"totalBalance": "37128395774543583310000000",
+							"totalSubsidy": "37099272000000000000000000",
+							"blockSubsidy": "8000000000000000000"
+						}
+					},
+					"consensus": {
+						"state": "healthy",
+						"connected": true,
+						"peers": 25,
+						"isSyncing": false,
+						"shouldHavePeers": false,
+						"headAgeSeconds": 0,
+						"observedAt": 1795633212607,
+						"reasons": []
+					},
+					"liveUpdatedAt": 1795633212607,
+					"liveStatsAgeSeconds": 2
+				}
+			}
+		},
+		"testnet": {
+			"faucet_chain": {
+				"503": {
+					"error": "Faucet RPC did not verify the release genesis"
+				},
+				"200": {
+					"network": "testnet",
+					"chain": "FLOP Testnet",
+					"genesisHash": "0x918abd58fb16306b30ef3886514cfaebffecb4de43e82b6f8ec4795c43cfd800",
+					"caip2": "polkadot:918abd58fb16306b30ef3886514cfaeb",
+					"ss58Format": 42,
+					"decimals": 18,
+					"tokenSymbol": "FLOP",
+					"rpc": "wss://testnet.flop.network",
+					"walletConnect": false,
+					"technocoreBot": {
+						"did": "did:key:z6MktjwdcBkwC6xo9wi4KY4ckWvn1GQHdQ1qzkaZtWqHAoxs",
+						"room": "flop-testnet-faucet"
+					}
+				}
+			},
+			"faucet_limits": {
+				"200": {
+					"network": "testnet",
+					"faucet": {
+						"status": "open",
+						"signer": "5CcDr5BcVWGqdyk7EK3S43PPd4E1yTFHPMGjtjqvRLttgXtw",
+						"balanceFlop": "3842877",
+						"minBalanceFlop": "5000",
+						"dailyCap": {
+							"limitFlop": "10000000",
+							"usedFlop": "7193920",
+							"remainingFlop": "2806080"
+						},
+						"pendingGrants": 0,
+						"anonymous": {
+							"grantFlop": 25,
+							"addressCooldownSeconds": 86400
+						},
+						"linked": {
+							"baseFlop": 500,
+							"perGrantCapFlop": 2000,
+							"rolling7DayCapFlop": 2000,
+							"identityCooldownSeconds": 86400
+						},
+						"agent": {
+							"grantFlop": 10,
+							"claimPath": "/v1/testnet/agent-claims",
+							"rolling24HourCapFlop": 10,
+							"cooldownSeconds": 86400,
+							"rolloverRequiresSpend": true
+						},
+						"perClient": {
+							"ipGrantsPerDay": 3,
+							"ipRangeGrantsPerDay": 20,
+							"ipCooldownSeconds": 86400
+						}
+					},
+					"sponsor": {
+						"miner": {
+							"status": "open",
+							"signer": "5E9jfrPrvQJvkjoSGLTdeqmqWHvAgxyGyTNW8VqtCUtgVcnb",
+							"spendableFlop": "2000000",
+							"capacity": {
+								"signers": 1,
+								"used": 0,
+								"max": 64,
+								"active": 0,
+								"unbonding": 0,
+								"other": 0
+							},
+							"dailyNewSponsorships": {
+								"used": 0,
+								"limit": 100
+							},
+							"dailyStakeBudget": {
+								"limitFlop": "10000000",
+								"usedFlop": "0"
+							},
+							"automatic": null
+						},
+						"validator": {
+							"status": "automatic_full",
+							"signer": "5HDsVnQ4e5w4N47CFL87MAxrurXqDnci7KXV34mb9y32y1MW",
+							"spendableFlop": "120000000",
+							"capacity": {
+								"signers": 1,
+								"used": 0,
+								"max": 64,
+								"active": 0,
+								"unbonding": 0,
+								"other": 0
+							},
+							"dailyNewSponsorships": {
+								"used": 0,
+								"limit": 100
+							},
+							"dailyStakeBudget": {
+								"limitFlop": "150000000",
+								"usedFlop": "0"
+							},
+							"automatic": {
+								"open": false,
+								"sponsored": 6,
+								"unsponsoredActive": 0
+							}
+						}
+					},
+					"asOf": "2026-11-25T18:59:36.401Z",
+					"stale": false
+				}
+			},
+			"faucet_health": {
+				"503": {
+					"status": "degraded",
+					"signer": "5CcDr5BcVWGqdyk7EK3S43PPd4E1yTFHPMGjtjqvRLttgXtw",
+					"connected": true,
+					"freeBalanceRaw": "3842877026059041150000000",
+					"minBalanceRaw": "5000000000000000000000",
+					"decimals": 18,
+					"trustProxy": ["172.20.0.1/32"],
+					"limits": {
+						"ipCooldownMs": 86400000,
+						"ipGrantsPerDay": 3,
+						"ipPrefixGrantsPerDay": 20,
+						"addressCooldownMs": 86400000,
+						"identityCooldownMs": 86400000,
+						"dailyCapFlop": 10000000,
+						"dailyCapExemptionConfigured": false
+					},
+					"image": {
+						"version": "0.1.489",
+						"revision": "af7e1e4f8adb70db2323f10ff1ea80cd943c0db3"
+					},
+					"live": true,
+					"ready": false,
+					"readinessScope": "dependencies and estimated funding capacity for this client; grant eligibility and unreviewed sponsor capacity checked on request",
+					"dependencies": {
+						"signer": {
+							"ok": true
+						},
+						"indexer": {
+							"ok": false,
+							"reason": "indexer_unavailable",
+							"error": "Indexer unavailable; retry later"
+						},
+						"ip_classification": {
+							"ok": true,
+							"details": {
+								"exempt": true
+							}
+						},
+						"funding": {
+							"ok": true,
+							"asOf": "2026-11-25T18:59:36.401Z",
+							"stale": false,
+							"faucet": {
+								"status": "open"
+							},
+							"sponsor": {
+								"miner": {
+									"status": "open"
+								},
+								"validator": {
+									"status": "automatic_full"
+								}
+							}
+						},
+						"signing": {
+							"held": false,
+							"reason": null,
+							"sinceSeconds": null
+						}
+					}
+				}
+			},
+			"explorer_stats": {
+				"503": {
+					"error": "Era-T reader unavailable"
+				}
+			}
+		}
+	}
+}
