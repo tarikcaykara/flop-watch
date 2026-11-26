@@ -1,0 +1,5 @@
+# The build context holds only what the collector image needs; .env and every secret stay out.
+*
+!package.json
+!pnpm-lock.yaml
+!src
