@@ -44,7 +44,7 @@ flowchart LR
 | Type check | `tsc --noEmit` | Type checking only, never emitting |
 | Modules / package manager | ESM, pnpm | Maintainer's standard |
 | Runtime dependency | **`@prometheus-io/client` only** | Metric types, the registry and default process metrics. It is `prom-client` moved to the Prometheus organisation; `prom-client` is deprecated on npm in its favour (2026-08). Same Apache-2.0 licence and transitive dependencies. |
-| Dev dependencies | `typescript`, `@types/node`, `@biomejs/biome`, `ws` (+ `@types/ws`) | Type check, lint and format; `ws` serves the fake RPC node in the chain-watcher tests, because Node has a WebSocket client but no server |
+| Dev dependencies | `typescript`, `@types/node`, `@biomejs/biome`, `ws` (+ `@types/ws`) | Type check, lint and format; `ws` serves the fake RPC node in the chain-watcher tests and the fake FLOP service of the stack e2e, because Node has a WebSocket client but no server |
 | Chain transport | Global `fetch` and `WebSocket`, raw JSON-RPC 2.0 | Verified in the PoC. Uses the legacy `chain_subscribeNewHeads`, `chain_subscribeFinalizedHeads` and `state_subscribeRuntimeVersion`, which were accepted on both networks with no drop in 300 s |
 | HTTP server | `node:http` | One route (`/metrics`) plus `/healthz`; no framework needed |
 | Tests | `node:test` with recorded fixtures from `poc/results` | No test framework dependency. Timers are injected (`schedule` option) and driven by a manual clock: `node:test`'s timer mocks interfere with the built-in WebSocket client across tests |
@@ -426,8 +426,15 @@ that Prometheus loads all 20 rules and evaluates them without errors.
   - `read_only: true` root filesystem; a healthcheck on `/healthz` at `FLOPWATCH_PORT`.
   - The CI gate builds it on every pull request and every push to `main`.
 - **Stack e2e.** `pnpm test:e2e` (needs Docker) checks `compose.yaml` and runs the stack with
-  `test/e2e/compose.e2e.yaml`, which points the collector at a closed local port, so no FLOP host
-  is contacted. #38 adds a fake FLOP service and runs it in CI.
+  `test/e2e/compose.e2e.yaml`, so no FLOP host is contacted:
+  - The collector's endpoints for both networks point at a fake FLOP service,
+    `test/e2e/fake-flop.ts`. It serves the RPC (WebSocket and HTTP), faucet and explorer from the
+    recorded fixtures, and continues each chain with one parent-linked block per second.
+  - The fake runs in the collector's image, with the repository's test code and `node_modules`
+    mounted read-only, so no other image is pinned. It is not published.
+  - The e2e checks mvp §6 criteria 1, 2 and 4 in Prometheus, and Grafana's anonymous read-only
+    access (§11). Criterion 2 recreates the collector with a wrong Testnet genesis.
+  - CI runs it in its own `e2e` job, a required check next to `gate`.
 - **Public instance.** The same Compose stack on the maintainer's server. Only Grafana is exposed,
   through the maintainer's reverse proxy or tunnel; that configuration lives outside this repo.
 - **Retention.** 180 days covers the roughly 90-day Testnet with headroom. At about 500 series and a
