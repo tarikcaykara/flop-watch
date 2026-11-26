@@ -313,9 +313,10 @@ describe("the stack", { timeout: 600_000 }, () => {
 
 	it("measures 1 s block intervals from each fake chain's parent-linked heads", async () => {
 		const intervals = async () => {
-			// One query, so the count and its buckets come from the same scrape.
+			// One query, so the count and its buckets come from the same scrape. Prometheus 3 stores
+			// `le` as a float: the collector's le="1" bucket is le="1.0".
 			const series = await values(
-				'{__name__=~"flopwatch_chain_block_interval_seconds_(count|bucket)", le=~"|0.5|1"}',
+				'{__name__=~"flopwatch_chain_block_interval_seconds_(count|bucket)", le=~"|0.5|1.0"}',
 				"network",
 				"le",
 			);
@@ -323,7 +324,7 @@ describe("the stack", { timeout: 600_000 }, () => {
 				const count = series[`${network} `] ?? 0;
 				return {
 					observed: count > 0,
-					over1s: count - (series[`${network} 1`] ?? 0),
+					over1s: count - (series[`${network} 1.0`] ?? 0),
 					under05s: series[`${network} 0.5`] ?? 0,
 				};
 			};
