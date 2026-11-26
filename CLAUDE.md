@@ -5,8 +5,7 @@ genesis identity, best and finalized head, block interval, finality lag, and fau
 status, with history in Prometheus and display in Grafana. It is a single maintainer project, so
 keep everything boring and small (KISS/YAGNI).
 
-The owner communicates in Turkish and expects Turkish replies. Everything in the repo is English:
-code, comments, docs, commits, issues and PRs.
+Everything in the repo is English: code, comments, docs, commits, issues and PRs.
 
 ## Read first
 
@@ -81,8 +80,7 @@ pushing a change to the Dockerfile, `compose.yaml`, `prometheus/` or `grafana/`;
 
 ## Workflow
 
-- `gh` runs as the repo owner: prefix every call with `GH_TOKEN="$(gh auth token -u tarikcaykara)"`
-  (the active gh account is a different one). Never ask for, store or handle credentials.
+- Never ask for, store or handle credentials.
 - **Never commit to `main`.** Each issue goes branch `<type>/<issue>-<slug>` → PR → reviewer-agent
   pass → green CI → squash merge, with the PR title as the commit subject. One issue = one PR.
 - **Order.** Work follows the issues' "Depends on" order within the current milestone. The owner
