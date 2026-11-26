@@ -315,7 +315,8 @@ annotation, because Grafana reads firing alerts from the `ALERTS` series, which 
 - 30 and 120 blocks come from the yellowpaper
   ([params](https://raw.githubusercontent.com/flop-labs/yellowpaper/main/params/flop-protocol-params.yaml)).
 - All other thresholds and `for` durations are **proposed defaults**. The rules file says so in a
-  header comment, and each such alert's summary ends with "(proposed default)".
+  header comment, and each alert with a proposed numeric threshold ends its summary with
+  "(proposed default)".
 - `FlopFaucetLimitsStale` uses 300 s with `for: 5m` because the observed `asOf` age already swings
   between 0.4 and 5.4 min in normal operation (research.md §10.3).
 
@@ -404,7 +405,8 @@ rules and evaluates them without errors.
     env file; a missing `.env` still stops `docker compose up` at the `GRAFANA_ADMIN_PASSWORD` check.
   - `prometheus`: `--storage.tsdb.retention.time=180d`, `--query.timeout=20s`,
     `--query.max-samples=5000000`. It reads `prometheus/prometheus.yml`, whose scrape job is named
-    `flop-watch` ([dashboard.md](dashboard.md) §7), and is not published. #13 adds the rules.
+    `flop-watch` ([dashboard.md](dashboard.md) §7), and the rules in `prometheus/rules/` (§7); it
+    is not published.
   - `grafana`: published **only** on `127.0.0.1`, port `GRAFANA_PORT` (default 3000). The admin
     password comes from `GRAFANA_ADMIN_PASSWORD` in `.env`, and only when the Grafana database is
     first created. Usage reporting, update checks and plugin preinstalls are off; #14 sets the rest

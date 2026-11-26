@@ -386,3 +386,69 @@ tests:
           - exp_labels: { network: testnet, severity: warning, category: derived }
             exp_annotations:
               summary: Explorer indexer over 120 blocks behind on testnet (proposed default)
+
+  # Each threshold just below and just above, held past its `for`.
+  - name: threshold boundaries
+    interval: 15s
+    input_series:
+      # Head timestamps that advance with time, so each age stays constant.
+      - series: flopwatch_chain_best_head_received_timestamp_seconds{network="best30"}
+        values: -30+15x40
+      - series: flopwatch_chain_best_head_received_timestamp_seconds{network="best31"}
+        values: -31+15x40
+      - series: flopwatch_chain_finalized_head_received_timestamp_seconds{network="final120"}
+        values: -120+15x40
+      - series: flopwatch_chain_finalized_head_received_timestamp_seconds{network="final121"}
+        values: -121+15x40
+      - series: flopwatch_chain_best_block_number{network="explorer120"}
+        values: 220x40
+      - series: flopwatch_explorer_latest_block_number{network="explorer120"}
+        values: 100x40
+      - series: flopwatch_chain_best_block_number{network="explorer121"}
+        values: 221x40
+      - series: flopwatch_explorer_latest_block_number{network="explorer121"}
+        values: 100x40
+      # Another scrape job that is down must not raise FlopWatchDown.
+      - series: up{job="other",instance="other:9100"}
+        values: 0x40
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: FlopBestHeadStale
+        exp_alerts:
+          - exp_labels: { network: best31, severity: warning, category: derived }
+            exp_annotations:
+              summary: No new head over the RPC WebSocket for over 30 s on best31 (proposed default)
+      - eval_time: 3m
+        alertname: FlopFinalityStalled
+        exp_alerts:
+          - exp_labels: { network: final121, severity: critical, category: derived }
+            exp_annotations:
+              summary: >-
+                Finality stalled on final121: lag over 120 blocks (yellowpaper
+                FinalityFreezeThreshold) or no finalized head for over 120 s (proposed default)
+      - eval_time: 6m
+        alertname: FlopExplorerIndexerLagging
+        exp_alerts:
+          - exp_labels: { network: explorer121, severity: warning, category: derived }
+            exp_annotations:
+              summary: Explorer indexer over 120 blocks behind on explorer121 (proposed default)
+      - eval_time: 3m
+        alertname: FlopWatchDown
+        exp_alerts: []
+
+  # A runtime upgrade stays an incident for 15 min, then clears.
+  - name: runtime upgrade window
+    interval: 15s
+    input_series:
+      - series: flopwatch_runtime_spec_version{network="testnet"}
+        values: 1014034 1014035x80
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: FlopRuntimeUpgraded
+        exp_alerts:
+          - exp_labels: { network: testnet, severity: info, category: reported }
+            exp_annotations:
+              summary: Runtime spec version changed on testnet
+      - eval_time: 16m
+        alertname: FlopRuntimeUpgraded
+        exp_alerts: []
