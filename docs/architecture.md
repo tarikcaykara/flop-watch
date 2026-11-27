@@ -400,18 +400,24 @@ that Prometheus loads all 20 rules and evaluates them without errors.
 ## 10. Deployment
 
 - **`compose.yaml`** has three services:
-  - `flop-watch`: the collector, built from the repository, and not published; Prometheus scrapes
-    it on the Compose network. It gets the whole `.env`, so the unknown-variable check (§9) still
-    catches a mistyped `FLOPWATCH_*` name; the cost is that `GRAFANA_ADMIN_PASSWORD` is in its
-    environment too, unused. The `.env` is optional only so the stack's checks can run with another
-    env file; a missing `.env` still stops `docker compose up` at the `GRAFANA_ADMIN_PASSWORD` check.
+  - `flop-watch`: the collector, tagged `flop-watch:<COLLECTOR_VERSION>` (default `local`) and
+    built from the repository when that image is missing. It is not published; Prometheus scrapes
+    it on the Compose network. A deployment that loads each release under its own tag keeps the
+    previous image for a rollback.
+    It gets the whole `.env`, so the unknown-variable check (§9) still catches a mistyped
+    `FLOPWATCH_*` name; the cost is that `GRAFANA_ADMIN_PASSWORD` is in its environment too,
+    unused. The `.env` is optional only so the stack's checks can run with another env file; a
+    missing `.env` still stops `docker compose up` at the `GRAFANA_ADMIN_PASSWORD` check.
   - `prometheus`: `--storage.tsdb.retention.time=180d`, `--query.timeout=20s`,
     `--query.max-samples=5000000`. It reads `prometheus/prometheus.yml`, whose scrape job is named
     `flop-watch` ([dashboard.md](dashboard.md) §7), and the rules in `prometheus/rules/` (§7); it
     is not published.
   - `grafana`: published **only** on `127.0.0.1`, port `GRAFANA_PORT` (default 3000). The admin
     password comes from `GRAFANA_ADMIN_PASSWORD` in `.env`, and only when the Grafana database is
-    first created. §11 lists its other settings.
+    first created. Its root URL comes from `GRAFANA_ROOT_URL` (default
+    `http://127.0.0.1:<GRAFANA_PORT>/`): Grafana builds its links, short URLs among them, from it,
+    and Grafana Live by default accepts WebSocket connections only from that origin, so a public
+    instance sets it to its public address. §11 lists its other settings.
   - Prometheus and Grafana images are pinned to exact versions; Prometheus and Grafana have
     healthchecks, so `docker compose up --wait` returns once the stack is ready.
 - **Volumes.** Named volumes for Prometheus and Grafana data; `prometheus/` and the Grafana

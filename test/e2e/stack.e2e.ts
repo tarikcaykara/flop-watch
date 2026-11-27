@@ -82,15 +82,18 @@ interface ComposeConfig {
 describe("compose.yaml", () => {
 	let services: Record<string, ComposeService> = {};
 
-	before(async () => {
+	/** compose.yaml resolved with .env.example; an exported variable would win, so each is emptied first. */
+	async function resolved(env: Record<string, string> = {}): Promise<ComposeConfig> {
 		const json = await compose(["config", "--format", "json"], {
 			files: ["compose.yaml"],
 			envFile: ".env.example",
-			// An exported GRAFANA_PORT would win over the env file; empty keeps compose's default.
-			env: { GRAFANA_PORT: "" },
+			env: { GRAFANA_PORT: "", GRAFANA_ROOT_URL: "", COLLECTOR_VERSION: "", ...env },
 		});
-		const config: ComposeConfig = JSON.parse(json);
-		services = config.services;
+		return JSON.parse(json);
+	}
+
+	before(async () => {
+		services = (await resolved()).services;
 	});
 
 	it("has the collector, Prometheus and Grafana", () => {
@@ -127,6 +130,23 @@ describe("compose.yaml", () => {
 
 	it("runs the collector on a read-only root filesystem", () => {
 		assert.equal(services["flop-watch"]?.read_only, true);
+	});
+
+	it("tags the collector image with COLLECTOR_VERSION, local by default", async () => {
+		assert.equal(services["flop-watch"]?.image, "flop-watch:local");
+		const tagged = await resolved({ COLLECTOR_VERSION: "0.1.0" });
+		assert.equal(tagged.services["flop-watch"]?.image, "flop-watch:0.1.0");
+	});
+
+	it("gives Grafana GRAFANA_ROOT_URL as its root URL, the published address by default", async () => {
+		const rootUrl = (c: ComposeConfig) =>
+			c.services["grafana"]?.environment?.["GF_SERVER_ROOT_URL"];
+		assert.equal(rootUrl({ services }), "http://127.0.0.1:3000/");
+		assert.equal(rootUrl(await resolved({ GRAFANA_PORT: "8083" })), "http://127.0.0.1:8083/");
+		assert.equal(
+			rootUrl(await resolved({ GRAFANA_ROOT_URL: "https://flop-watch.example/" })),
+			"https://flop-watch.example/",
+		);
 	});
 
 	it("gives anonymous visitors Viewer access with the §11 hardening", () => {
