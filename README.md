@@ -65,11 +65,11 @@ Prometheus keeps 180 days of history.
 Only Grafana is published, and only on `127.0.0.1`. The collector and Prometheus are reachable
 only inside the Compose network.
 
-To make the dashboard public, put your own reverse proxy or tunnel in front of Grafana, and set a
-strong admin password first. Anonymous visitors get the Viewer role. Viewers can still send their
-own PromQL queries through Grafana and create short URLs; the
-[security notes](docs/architecture.md#11-security) explain why this is accepted and how to limit
-it.
+To make the dashboard public, put your own reverse proxy or tunnel in front of Grafana, set a
+strong admin password first, and set `GRAFANA_ROOT_URL` to the public address. Anonymous visitors
+get the Viewer role. Viewers can still send their own PromQL queries through Grafana and create
+short URLs; the [security notes](docs/architecture.md#11-security) explain why this is accepted
+and how to limit it.
 
 ## Configuration
 
@@ -80,6 +80,8 @@ After a change, run `docker compose up -d` again.
 |---|---|---|
 | `GRAFANA_ADMIN_PASSWORD` | none, required | Grafana's admin password, read on the first start only |
 | `GRAFANA_PORT` | `3000` | Port of Grafana on `127.0.0.1` |
+| `GRAFANA_ROOT_URL` | `http://127.0.0.1:<GRAFANA_PORT>/` | The address visitors open Grafana at; behind a reverse proxy or tunnel, its public URL |
+| `COLLECTOR_VERSION` | `local` | Tag of the collector image that `docker compose` builds and runs, `flop-watch:<COLLECTOR_VERSION>` |
 | `FLOPWATCH_NETWORKS` | `devnet,testnet` | The networks to watch |
 | `FLOPWATCH_<NET>_RPC_WS` | the network's public RPC | WebSocket RPC URL (`ws://` or `wss://`) |
 | `FLOPWATCH_<NET>_RPC_HTTP` | the network's public RPC | HTTP RPC URL (`http://` or `https://`) |
