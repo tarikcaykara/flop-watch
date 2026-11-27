@@ -81,7 +81,7 @@ After a change, run `docker compose up -d` again.
 | `GRAFANA_ADMIN_PASSWORD` | none, required | Grafana's admin password, read on the first start only |
 | `GRAFANA_PORT` | `3000` | Port of Grafana on `127.0.0.1` |
 | `GRAFANA_ROOT_URL` | `http://127.0.0.1:<GRAFANA_PORT>/` | The address visitors open Grafana at; behind a reverse proxy or tunnel, its public URL |
-| `COLLECTOR_VERSION` | `local` | Tag of the collector image that `docker compose` builds and runs, `flop-watch:<COLLECTOR_VERSION>` |
+| `COLLECTOR_VERSION` | `local` | Tag of the collector image, `flop-watch:<COLLECTOR_VERSION>`; `docker compose` builds it if it is missing |
 | `FLOPWATCH_NETWORKS` | `devnet,testnet` | The networks to watch |
 | `FLOPWATCH_<NET>_RPC_WS` | the network's public RPC | WebSocket RPC URL (`ws://` or `wss://`) |
 | `FLOPWATCH_<NET>_RPC_HTTP` | the network's public RPC | HTTP RPC URL (`http://` or `https://`) |
