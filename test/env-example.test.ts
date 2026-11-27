@@ -29,6 +29,8 @@ describe(".env.example", () => {
 			...["DEVNET", "TESTNET"].flatMap((net) => networkVars.map((v) => `FLOPWATCH_${net}_${v}`)),
 			"GRAFANA_ADMIN_PASSWORD",
 			"GRAFANA_PORT",
+			"GRAFANA_ROOT_URL",
+			"COLLECTOR_VERSION",
 		];
 		assert.deepEqual(entries.map((e) => e.key).toSorted(), expected.toSorted());
 	});
